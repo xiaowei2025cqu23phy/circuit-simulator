@@ -342,7 +342,7 @@ Ctrl+Y    重做已撤销的操作
 
 遇到问题？有建议？
 
-- 📧 **Email**: xiaowei2025cqu23phy@example.com
+- 📧 **Email**: [cqu.phy.23xiaowei@qq.com](cqu.phy.23xiaowei@qq.com)
 - 🐛 **提交 Issue**: [GitHub Issues](https://github.com/xiaowei2025cqu23phy/circuit-simulator/issues)
 - 💡 **讨论**: [GitHub Discussions](https://github.com/xiaowei2025cqu23phy/circuit-simulator/discussions)
 
