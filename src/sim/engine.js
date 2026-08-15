@@ -58,7 +58,7 @@ export const getSourceValue = (el, t) => {
   const T = 1 / freq;
   const phase = (t % T) / T;
 
-  if (type === 'AC') return amp * Math.sin(2 * Math.PI * phase) + offset;
+  if (type === 'AC') return amp * Math.sin(2 * Math.PI * phase + (Number(el.phase) || 0) * Math.PI / 180) + offset;
   if (type === 'SQUARE') return (phase < (duty / 100)) ? (amp + offset) : (-amp + offset);
   if (type === 'TRIANGLE') return (Math.abs(phase - 0.5) * 4 - 1) * amp + offset;
 
@@ -201,6 +201,7 @@ export function sanitizeElements(rawEls) {
       el.waveType = WAVE_TYPES.has(raw.waveType) ? raw.waveType : 'DC';
       el.freq = clamp(num(raw.freq, 50), 1e-3, 1e9);
       el.duty = clamp(num(raw.duty, 50), 0, 100);
+      el.phase = clamp(num(raw.phase, 0), -360, 360);
       el.stepTime = Math.max(num(raw.stepTime, 0.001), 0);
       el.v1 = num(raw.v1, 0);
       el.v2 = num(raw.v2, 5);

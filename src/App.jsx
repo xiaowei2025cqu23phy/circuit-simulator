@@ -1,11 +1,11 @@
-import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, memo, useMemo } from 'react';
 import {
   MousePointer2, Minus, Zap, Activity, Trash2, Play, AlertCircle,
   RotateCw, Tag, GitCommit, LineChart, StopCircle, ArrowRight,
   TriangleRight, ToggleLeft, Download, Upload, ZoomIn, ZoomOut, Move, Trash,
   CircleDot, Pause, Save, FolderOpen, Undo2, Redo2, HelpCircle, Route, Home, Copy, Plus, X
 } from 'lucide-react';
-import { compileCircuit, stepEngine, sanitizeElements, nextId } from './sim/engine.js';
+import { compileCircuit, stepEngine, sanitizeElements, nextId, getSourceValue } from './sim/engine.js';
 import { PREDEFINED_CIRCUITS } from './sim/circuits.js';
 import { formatValue, formatVoltage, formatCurrent, formatTime, UNIT_OF, TOOL_HINTS } from './sim/format.js';
 
@@ -172,84 +172,181 @@ const StaticElement = memo(({ el, isSelected, isSimulating, switchStates }) => {
 });
 
 // ==========================================
-// 信号源波形参数面板
+// 信号源波形参数面板（可视化选择 + 实时预览）
 // ==========================================
+export { WaveformParams, WavePreview }; // 供测试/复用
+const WAVE_OPTIONS = [
+  { id: 'DC', name: '直流' },
+  { id: 'AC', name: '正弦' },
+  { id: 'STEP', name: '阶跃' },
+  { id: 'SQUARE', name: '方波' },
+  { id: 'TRIANGLE', name: '三角' },
+  { id: 'PULSE', name: '脉冲' },
+  { id: 'EXP', name: '指数' },
+];
+
+/** 波形小图标 */
+const WaveIcon = ({ type }) => {
+  const s = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round' };
+  switch (type) {
+    case 'DC': return <svg viewBox="0 0 24 12" className="w-6 h-3"><line x1="1" y1="6" x2="23" y2="6" {...s} /></svg>;
+    case 'AC': return <svg viewBox="0 0 24 12" className="w-6 h-3"><path d="M1 6 Q 3.5 0 6 6 T 11 6 T 16 6 T 21 6" {...s} /></svg>;
+    case 'STEP': return <svg viewBox="0 0 24 12" className="w-6 h-3"><path d="M1 3 H7 V9 H23" {...s} /></svg>;
+    case 'SQUARE': return <svg viewBox="0 0 24 12" className="w-6 h-3"><path d="M1 3 H6 V9 H12 V3 H18 V9 H23" {...s} /></svg>;
+    case 'TRIANGLE': return <svg viewBox="0 0 24 12" className="w-6 h-3"><path d="M1 9 H6 V3 H12 V9 H18 V3 H23" {...s} /></svg>;
+    case 'PULSE': return <svg viewBox="0 0 24 12" className="w-6 h-3"><path d="M1 3 H5 V3 H6.5 V9 H11 V9 H12.5 V3 H23" {...s} /></svg>;
+    case 'EXP': return <svg viewBox="0 0 24 12" className="w-6 h-3"><path d="M1 3 H3 Q 12 3 23 9" {...s} /></svg>;
+    default: return null;
+  }
+};
+
+/** 波形实时预览：按当前参数采样并绘制窗口波形，参数变化即时重绘 */
+const WavePreview = memo(({ el }) => {
+  const data = useMemo(() => {
+    const type = el.waveType || 'DC';
+    const N = 260;
+    let win = 2e-3;
+    if (type === 'STEP') win = Math.max((Number(el.stepTime) || 0.001) * 2.2, 1e-4);
+    else if (type !== 'DC') {
+      const per = type === 'PULSE' ? (Number(el.per) || 2e-3) : 1 / (Number(el.freq) || 50);
+      win = Math.max(per * 2, 2e-4);
+      if (type === 'EXP') {
+        win = Math.max(win, (Number(el.td2) || 1e-3) + 6 * Math.max(Number(el.tau2) || 1e-3, 1e-9));
+      }
+    }
+    let warn = null;
+    if (type === 'PULSE') {
+      const seg = (Number(el.tr) || 1e-6) + (Number(el.pw) || 1e-3) + (Number(el.tf) || 1e-6);
+      if (seg >= (Number(el.per) || 2e-3)) warn = '⚠️ 上升+脉宽+下降 ≥ 周期，脉冲将变形';
+    }
+    let mm = -Infinity, mn = Infinity;
+    const pts = [];
+    for (let i = 0; i <= N; i++) {
+      const t = (i / N) * win;
+      const v = getSourceValue(el, t);
+      if (v > mm) mm = v;
+      if (v < mn) mn = v;
+      pts.push([t, v]);
+    }
+    mm = Math.max(mm, 0); mn = Math.min(mn, 0);
+    let vMax = mm, vMin = mn;
+    if (vMax === vMin) { vMax += 1; vMin -= 1; }
+    const pad = (vMax - vMin) * 0.08;
+    vMax += pad; vMin -= pad;
+    const W = 200, H = 54;
+    const x0 = 2, x1 = W - 2, y0 = 4, y1 = H - 4;
+    const mapY = (v) => y1 - ((v - vMin) / (vMax - vMin)) * (y1 - y0);
+    let d = '';
+    pts.forEach(([t, v], i) => {
+      const x = x0 + (t / win) * (x1 - x0);
+      d += `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${mapY(v).toFixed(2)}`;
+    });
+    const zeroY = (0 >= vMin && 0 <= vMax) ? mapY(0) : null;
+    return { d, zeroY, vpp: mm - mn, win, warn };
+  }, [el]);
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-1.5">
+      <svg viewBox="0 0 200 54" className="w-full h-12 block" preserveAspectRatio="none">
+        {data.zeroY !== null && <line x1="0" y1={data.zeroY} x2="200" y2={data.zeroY} stroke="#cbd5e1" strokeWidth="1" strokeDasharray="3 3" />}
+        <path d={data.d} fill="none" stroke="#4f46e5" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
+      </svg>
+      <div className="flex justify-between text-[10px] text-gray-500 font-mono mt-0.5 px-0.5">
+        <span>峰峰值 {formatVoltage(data.vpp)}</span>
+        <span>窗口 {formatTime(data.win)}</span>
+      </div>
+      {data.warn && <div className="text-[10px] text-red-500 mt-0.5">{data.warn}</div>}
+    </div>
+  );
+});
+
 const WaveformParams = ({ el, updateProps }) => {
   const waveType = el.waveType || 'DC';
   const unit = el.type === 'voltage' ? 'V' : 'A';
-  const labelInput = (text, value, onChange, opts = {}) => (
-    <label className="flex items-center justify-between gap-1">
-      <span className="whitespace-nowrap">{text}</span>
-      <input type="number" step={opts.step} value={value} onChange={onChange} className="w-20 border rounded px-1 py-0.5 text-right" />
-    </label>
+
+  const field = (label, key, def, opts = {}) => (
+    <div className="flex-1">
+      <label className="block text-xs mb-1 text-gray-500">{label}</label>
+      <input
+        type="number"
+        step={opts.step}
+        value={el[key] ?? def}
+        onChange={(e) => {
+          let v = parseFloat(e.target.value);
+          if (!Number.isFinite(v)) v = def;
+          if (opts.clamp) v = opts.clamp(v);
+          updateProps({ [key]: v });
+        }}
+        className="w-full px-2 py-1 border rounded text-sm"
+      />
+    </div>
   );
+  const grid = (items) => (
+    <div className="grid grid-cols-2 gap-2">
+      {items.map((it, i) => <React.Fragment key={i}>{it}</React.Fragment>)}
+    </div>
+  );
+  const maxFreq = (v) => Math.max(v, 1e-3);
+  const min0 = (v) => Math.max(v, 0);
+  const minTiny = (v) => Math.max(v, 1e-12);
+  const duty01 = (v) => Math.min(100, Math.max(0, v));
+
   return (
     <div className="space-y-2">
+      {/* 波形类型可视化选择 */}
       <div>
-        <label className="block text-xs mb-1 text-gray-500">波形类型</label>
-        <select value={waveType} onChange={e => updateProps({ waveType: e.target.value })} className="w-full px-2 py-1 border rounded text-sm">
-          <option value="DC">直流 (DC)</option>
-          <option value="AC">正弦 (AC)</option>
-          <option value="STEP">阶跃 (STEP)</option>
-          <option value="SQUARE">方波 (SQUARE)</option>
-          <option value="TRIANGLE">三角波 (TRIANGLE)</option>
-          <option value="PULSE">脉冲 (PULSE)</option>
-          <option value="EXP">指数 (EXP)</option>
-        </select>
+        <label className="block text-xs mb-1 text-gray-500">激励波形类型</label>
+        <div className="grid grid-cols-4 gap-1">
+          {WAVE_OPTIONS.map(w => (
+            <button key={w.id} type="button" title={`${w.name} ${w.id}`}
+              onClick={() => updateProps({ waveType: w.id })}
+              className={`flex flex-col items-center gap-0.5 py-1.5 rounded-md border text-[10px] transition-colors ${waveType === w.id ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300 hover:text-indigo-700'}`}>
+              <WaveIcon type={w.id} />
+              {w.name}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {/* 实时波形预览 */}
+      <WavePreview el={el} />
+
+      {/* 通用参数 */}
       <div className="flex gap-2">
-        <div className="flex-1">
-          <label className="block text-xs mb-1 text-gray-500">{waveType === 'DC' ? `数值 (${unit})` : `幅值 (${unit})`}</label>
-          <input type="number" value={el.value} onChange={e => updateProps({ value: parseFloat(e.target.value) || 0 })} className="w-full px-2 py-1 border rounded text-sm" />
-        </div>
-        {waveType !== 'DC' && waveType !== 'STEP' && (
-          <div className="flex-1">
-            <label className="block text-xs mb-1 text-gray-500">偏置 ({unit})</label>
-            <input type="number" value={el.offset || 0} onChange={e => updateProps({ offset: parseFloat(e.target.value) || 0 })} className="w-full px-2 py-1 border rounded text-sm" />
-          </div>
-        )}
+        {field(waveType === 'DC' ? `数值 (${unit})` : `幅值 (${unit})`, 'value', waveType === 'DC' ? 0 : 5)}
+        {waveType !== 'DC' && waveType !== 'STEP' && field(`偏置 (${unit})`, 'offset', 0)}
       </div>
-      {['AC', 'SQUARE', 'TRIANGLE'].includes(waveType) && (
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <label className="block text-xs mb-1 text-gray-500">频率 (Hz)</label>
-            <input type="number" value={el.freq || 50} onChange={e => updateProps({ freq: Math.max(parseFloat(e.target.value) || 50, 1e-3) })} className="w-full px-2 py-1 border rounded text-sm" />
-          </div>
-          {waveType === 'SQUARE' && (
-            <div className="flex-1">
-              <label className="block text-xs mb-1 text-gray-500">占空比 (%)</label>
-              <input type="number" value={el.duty || 50} onChange={e => updateProps({ duty: Math.min(100, Math.max(0, parseFloat(e.target.value) || 50)) })} className="w-full px-2 py-1 border rounded text-sm" />
-            </div>
-          )}
-        </div>
-      )}
-      {waveType === 'STEP' && (
-        <div>
-          <label className="block text-xs mb-1 text-gray-500">阶跃时刻 (s)</label>
-          <input type="number" step="1e-4" value={el.stepTime || 0.001} onChange={e => updateProps({ stepTime: Math.max(parseFloat(e.target.value) || 0, 0) })} className="w-full px-2 py-1 border rounded text-sm" />
-        </div>
-      )}
-      {waveType === 'PULSE' && (
-        <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs mt-1 text-gray-600">
-          {labelInput('低电平 V1:', el.v1 || 0, e => updateProps({ v1: parseFloat(e.target.value) || 0 }))}
-          {labelInput('高电平 V2:', el.v2 || 5, e => updateProps({ v2: parseFloat(e.target.value) || 0 }))}
-          {labelInput('延迟 Td (s):', el.td || 0, e => updateProps({ td: parseFloat(e.target.value) || 0 }), { step: '1e-6' })}
-          {labelInput('上升 Tr (s):', el.tr || 1e-6, e => updateProps({ tr: Math.max(parseFloat(e.target.value) || 0, 1e-12) }), { step: '1e-6' })}
-          {labelInput('下降 Tf (s):', el.tf || 1e-6, e => updateProps({ tf: Math.max(parseFloat(e.target.value) || 0, 1e-12) }), { step: '1e-6' })}
-          {labelInput('脉宽 Pw (s):', el.pw || 1e-3, e => updateProps({ pw: Math.max(parseFloat(e.target.value) || 0, 1e-12) }), { step: '1e-6' })}
-          {labelInput('周期 Per (s):', el.per || 2e-3, e => updateProps({ per: Math.max(parseFloat(e.target.value) || 0, 1e-12) }), { step: '1e-6' })}
-        </div>
-      )}
-      {waveType === 'EXP' && (
-        <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs mt-1 text-gray-600">
-          {labelInput('起始 V1:', el.v1 || 0, e => updateProps({ v1: parseFloat(e.target.value) || 0 }))}
-          {labelInput('终值 V2:', el.v2 || 5, e => updateProps({ v2: parseFloat(e.target.value) || 0 }))}
-          {labelInput('延迟 Td1 (s):', el.td1 || 0, e => updateProps({ td1: parseFloat(e.target.value) || 0 }), { step: '1e-6' })}
-          {labelInput('时间常数 τ1:', el.tau1 || 1e-3, e => updateProps({ tau1: Math.max(parseFloat(e.target.value) || 0, 1e-12) }), { step: '1e-6' })}
-          {labelInput('延迟 Td2 (s):', el.td2 || 1e-3, e => updateProps({ td2: parseFloat(e.target.value) || 0 }), { step: '1e-6' })}
-          {labelInput('时间常数 τ2:', el.tau2 || 1e-3, e => updateProps({ tau2: Math.max(parseFloat(e.target.value) || 0, 1e-12) }), { step: '1e-6' })}
-        </div>
-      )}
+
+      {waveType === 'AC' && grid([
+        field('频率 (Hz)', 'freq', 50, { clamp: maxFreq }),
+        field('初相位 (°)', 'phase', 0, { clamp: (v) => Math.min(360, Math.max(-360, v)) }),
+      ])}
+      {waveType === 'SQUARE' && grid([
+        field('频率 (Hz)', 'freq', 50, { clamp: maxFreq }),
+        field('占空比 (%)', 'duty', 50, { clamp: duty01 }),
+      ])}
+      {waveType === 'TRIANGLE' && field('频率 (Hz)', 'freq', 50, { clamp: maxFreq })}
+      {waveType === 'STEP' && grid([
+        field('阶跃时刻 (s)', 'stepTime', 0.001, { clamp: min0, step: '1e-4' }),
+        field(`初始偏置 (${unit})`, 'offset', 0),
+      ])}
+      {waveType === 'PULSE' && grid([
+        field(`低电平 V1 (${unit})`, 'v1', 0),
+        field(`高电平 V2 (${unit})`, 'v2', 5),
+        field('延迟 Td (s)', 'td', 0, { step: '1e-6' }),
+        field('上升 Tr (s)', 'tr', 1e-6, { clamp: minTiny, step: '1e-6' }),
+        field('下降 Tf (s)', 'tf', 1e-6, { clamp: minTiny, step: '1e-6' }),
+        field('脉宽 Pw (s)', 'pw', 1e-3, { clamp: minTiny, step: '1e-6' }),
+        field('周期 Per (s)', 'per', 2e-3, { clamp: minTiny, step: '1e-6' }),
+      ])}
+      {waveType === 'EXP' && grid([
+        field(`起始 V1 (${unit})`, 'v1', 0),
+        field(`终值 V2 (${unit})`, 'v2', 5),
+        field('延迟 Td1 (s)', 'td1', 0, { step: '1e-6' }),
+        field('时间常数 τ1 (s)', 'tau1', 1e-3, { clamp: minTiny, step: '1e-6' }),
+        field('延迟 Td2 (s)', 'td2', 1e-3, { step: '1e-6' }),
+        field('时间常数 τ2 (s)', 'tau2', 1e-3, { clamp: minTiny, step: '1e-6' }),
+      ])}
     </div>
   );
 };
@@ -297,7 +394,7 @@ const HELP_SECTIONS = [
     lines: [
       '二极管：三角形一端为阳极 (A)，竖线一端为阴极 (K)，导通压降约 0.7V',
       '端子 / 标签：相同名称的端子或标签电气相连；命名为 GND 即接地',
-      '电压源波形：直流 / 正弦 / 阶跃 / 方波 / 三角波 / 脉冲 / 指数',
+      '电压源波形：直流 / 正弦 / 阶跃 / 方波 / 三角波 / 脉冲 / 指数，参数面板内置实时波形预览与初相位设置',
       '电路数据（JSON）可导出 / 导入，也可保存到浏览器本地工程管理器',
     ],
   },
@@ -573,7 +670,7 @@ export default function CircuitSimulator() {
         if (selectedTool === 'switch') { newEl.control = 'manual'; newEl.state = true; newEl.timeOn = 0.01; newEl.timeOff = 0.02; }
         if (selectedTool === 'voltage' || selectedTool === 'current') {
           newEl.value = selectedTool === 'voltage' ? 5 : 0.1;
-          newEl.offset = 0; newEl.waveType = 'DC'; newEl.freq = 50; newEl.duty = 50;
+          newEl.offset = 0; newEl.waveType = 'DC'; newEl.freq = 50; newEl.duty = 50; newEl.phase = 0;
           newEl.v1 = 0; newEl.v2 = 5; newEl.td = 0; newEl.tr = 1e-6; newEl.tf = 1e-6;
           newEl.pw = 0.001; newEl.per = 0.002; newEl.tau1 = 1e-3; newEl.tau2 = 1e-3; newEl.td1 = 0; newEl.td2 = 1e-3;
         }

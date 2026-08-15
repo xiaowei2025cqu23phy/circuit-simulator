@@ -77,11 +77,16 @@ test('getSourceValue: DC / STEP', () => {
   assert.equal(getSourceValue(step, 2e-3), 10);
 });
 
-test('getSourceValue: AC 正弦', () => {
+test('getSourceValue: AC 正弦（含初相位）', () => {
   const ac = { waveType: 'AC', value: 10, offset: 1, freq: 50 };
   assert.ok(Math.abs(getSourceValue(ac, 0) - 1) < 1e-12, 't=0 应等于偏置');
   assert.ok(Math.abs(getSourceValue(ac, 0.005) - 11) < 1e-9, '1/4 周期应达峰值');
   assert.ok(Math.abs(getSourceValue(ac, 0.01) - 1) < 1e-9, '半周期后回到偏置');
+  const ph = { waveType: 'AC', value: 10, offset: 0, freq: 50, phase: 90 };
+  assert.ok(Math.abs(getSourceValue(ph, 0) - 10) < 1e-9, '相位 90° 时 t=0 应为峰值');
+  assert.ok(Math.abs(getSourceValue(ph, 0.005)) < 1e-9, '相位 90° 时 1/4 周期过零');
+  const phNeg = { waveType: 'AC', value: 10, offset: 0, freq: 50, phase: -90 };
+  assert.ok(Math.abs(getSourceValue(phNeg, 0) + 10) < 1e-9, '相位 -90° 时 t=0 应为负峰值');
 });
 
 test('getSourceValue: 方波 / 三角波', () => {
@@ -131,6 +136,9 @@ test('sanitizeElements: 丢弃无效条目、钳制越界参数、去重 ID', ()
   assert.equal(elements[0].value, 1e-9, '负阻值应钳制到最小正值');
   assert.equal(elements[1].value, 5, '非法数值回退默认值');
   assert.equal(elements[1].waveType, 'DC', '未知波形回退 DC');
+  assert.equal(elements[1].phase, 0, '初相位默认 0');
+  const phaseSrc = { type: 'voltage', waveType: 'AC', phase: 450, p1: { x: 0, y: 0 }, p2: { x: 0, y: 40 } };
+  assert.equal(sanitizeElements([phaseSrc]).elements[0].phase, 360, '初相位应钳制到 ±360°');
   assert.equal(elements[2].id, 'w1');
   assert.notEqual(elements[3].id, 'w1', '重复 ID 应重新生成');
   const empty = sanitizeElements('garbage');
