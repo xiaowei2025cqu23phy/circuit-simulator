@@ -272,6 +272,7 @@ const HELP_SECTIONS = [
   {
     title: '⌨️ 快捷键',
     lines: [
+      '元件工具：Q 选择 · M 移动 · W 导线 · R 电阻 · C 电容 · L 电感 · D 二极管 · S 开关 · V 电压源 · I 电流源 · T 端子 · G 接地 · N 标签 · X 删除',
       'Ctrl+Z / Ctrl+Y — 撤销 / 重做',
       'Ctrl+C / Ctrl+V — 复制 / 粘贴（粘贴位置偏移 40px）',
       'Ctrl+D — 快速复制副本',
@@ -845,6 +846,28 @@ export default function CircuitSimulator() {
     scopeConfigRef.current = newConf;
   };
 
+  // ---------- 示波器画布 HiDPI 适配 ----------
+  const fitScopeCanvas = useCallback(() => {
+    const canvas = scopeCanvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.max(320, Math.round(rect.width * dpr));
+    const h = Math.max(120, Math.round(rect.height * dpr));
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+  }, []);
+
+  useEffect(() => {
+    fitScopeCanvas();
+    const ro = new ResizeObserver(fitScopeCanvas);
+    if (scopeCanvasRef.current) ro.observe(scopeCanvasRef.current);
+    window.addEventListener('resize', fitScopeCanvas);
+    return () => { ro.disconnect(); window.removeEventListener('resize', fitScopeCanvas); };
+  }, [fitScopeCanvas]);
+
   // ---------- 示波器绘制（时基按时间窗口）----------
   const drawOscilloscope = useCallback(() => {
     const canvas = scopeCanvasRef.current;
@@ -881,8 +904,9 @@ export default function CircuitSimulator() {
     const tStart = tNow - span;
     let startIdx = 0;
     while (startIdx < hist.length - 2 && hist[startIdx + 1].t < tStart) startIdx++;
-    const win = hist.slice(startIdx);
-    if (win.length < 2) {
+    const endIdx = hist.length;
+    const winLen = endIdx - startIdx;
+    if (winLen < 2) {
       ctx.fillStyle = '#64748b';
       ctx.font = '12px ui-monospace, monospace';
       ctx.textAlign = 'center';
@@ -890,14 +914,14 @@ export default function CircuitSimulator() {
       return;
     }
 
-    // 抽稀采样（最多 4000 点）
+    // 直接索引采样（最多 4000 点），避免复制大窗口
     let minV = Infinity, maxV = -Infinity, minI = Infinity, maxI = -Infinity;
-    const stride = Math.max(1, Math.ceil(win.length / 4000));
+    const stride = Math.max(1, Math.ceil(winLen / 4000));
     const idxs = [];
-    for (let i = 0; i < win.length; i += stride) idxs.push(i);
-    if (idxs[idxs.length - 1] !== win.length - 1) idxs.push(win.length - 1);
+    for (let i = startIdx; i < endIdx; i += stride) idxs.push(i);
+    if (idxs[idxs.length - 1] !== endIdx - 1) idxs.push(endIdx - 1);
     for (const i of idxs) {
-      const p = win[i];
+      const p = hist[i];
       if (p.v < minV) minV = p.v;
       if (p.v > maxV) maxV = p.v;
       if (p.i < minI) minI = p.i;
@@ -926,8 +950,8 @@ export default function CircuitSimulator() {
     ctx.strokeStyle = '#38bdf8';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    idxs.forEach((k, n) => {
-      const p = win[k];
+    idxs.forEach((i, n) => {
+      const p = hist[i];
       const x = mapX(p.t), y = mapYV(p.v);
       if (n === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     });
@@ -936,15 +960,15 @@ export default function CircuitSimulator() {
     // 电流轨迹
     ctx.strokeStyle = '#f87171';
     ctx.beginPath();
-    idxs.forEach((k, n) => {
-      const p = win[k];
+    idxs.forEach((i, n) => {
+      const p = hist[i];
       const x = mapX(p.t), y = mapYI(p.i);
       if (n === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     });
     ctx.stroke();
 
     // 末端光点
-    const lastP = win[win.length - 1];
+    const lastP = hist[endIdx - 1];
     ctx.fillStyle = '#38bdf8';
     ctx.beginPath(); ctx.arc(mapX(lastP.t), mapYV(lastP.v), 3, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#f87171';
@@ -1014,6 +1038,11 @@ export default function CircuitSimulator() {
   }, [isSimulating, loop]);
 
   // ---------- 键盘快捷键 ----------
+  const TOOL_KEYS = {
+    q: 'select', m: 'move', w: 'wire', r: 'resistor', c: 'capacitor',
+    l: 'inductor', d: 'diode', s: 'switch', v: 'voltage', i: 'current',
+    t: 'terminal', g: 'ground', n: 'label', x: 'delete',
+  };
   useEffect(() => {
     const onKey = (e) => {
       const tag = e.target.tagName;
@@ -1033,6 +1062,11 @@ export default function CircuitSimulator() {
         setIoModal(null);
         setShowHelp(false);
         setSelectedElementId(null);
+        return;
+      }
+      if (!mod && TOOL_KEYS[k]) {
+        setSelectedTool(TOOL_KEYS[k]);
+        setDrawingState(null);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -1041,20 +1075,20 @@ export default function CircuitSimulator() {
 
   // ---------- 工具栏 ----------
   const tools = [
-    { id: 'select', name: '选择/探测', icon: <MousePointer2 size={16} /> },
+    { id: 'select', name: '选择/探测 (Q)', icon: <MousePointer2 size={16} /> },
     { id: 'move', name: '移动 (M)', icon: <Move size={16} /> },
     { id: 'wire', name: '导线 (W)', icon: <Minus size={16} /> },
     { id: 'resistor', name: '电阻 (R)', icon: <Activity size={16} /> },
     { id: 'capacitor', name: '电容 (C)', icon: <Minus size={16} strokeDasharray="2 4" /> },
     { id: 'inductor', name: '电感 (L)', icon: <GitCommit size={16} /> },
     { id: 'diode', name: '二极管 (D)', icon: <TriangleRight size={16} /> },
-    { id: 'switch', name: '开关 (SW)', icon: <ToggleLeft size={16} /> },
+    { id: 'switch', name: '开关 (S)', icon: <ToggleLeft size={16} /> },
     { id: 'voltage', name: '电压源 (V)', icon: <Zap size={16} /> },
     { id: 'current', name: '电流源 (I)', icon: <ArrowRight size={16} /> },
-    { id: 'terminal', name: '接线端子', icon: <CircleDot size={16} /> },
-    { id: 'ground', name: '接地 (GND)', icon: <Minus size={16} style={{ transform: 'rotate(90deg)' }} /> },
-    { id: 'label', name: '网络标签', icon: <Tag size={16} /> },
-    { id: 'delete', name: '删除', icon: <Trash2 size={16} /> },
+    { id: 'terminal', name: '接线端子 (T)', icon: <CircleDot size={16} /> },
+    { id: 'ground', name: '接地 (G)', icon: <Minus size={16} style={{ transform: 'rotate(90deg)' }} /> },
+    { id: 'label', name: '网络标签 (N)', icon: <Tag size={16} /> },
+    { id: 'delete', name: '删除 (X)', icon: <Trash2 size={16} /> },
   ];
 
   const selectedEl = elements.find(e => e.id === selectedElementId) || null;

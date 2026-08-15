@@ -267,6 +267,17 @@ test('缺少接地端时报错', () => {
   assert.throws(() => compileCircuit(els), /接地/);
 });
 
+test('并联电压源（短路拓扑）时报错', () => {
+  const els = [
+    { id: 'v1', type: 'voltage', p1: { x: 0, y: 0 }, p2: { x: 0, y: 40 }, value: 5 },
+    { id: 'v2', type: 'voltage', p1: { x: 40, y: 0 }, p2: { x: 40, y: 40 }, value: 3 },
+    { id: 'w1', type: 'wire', p1: { x: 0, y: 0 }, p2: { x: 40, y: 0 } },
+    { id: 'w2', type: 'wire', p1: { x: 0, y: 40 }, p2: { x: 40, y: 40 } },
+    { id: 'g1', type: 'ground', p1: { x: 0, y: 40 } },
+  ];
+  assert.throws(() => compileCircuit(els), /非法|短路|悬空/);
+});
+
 test('悬空节点时报错（独立元件孤岛）', () => {
   const els = [
     { id: 'v1', type: 'voltage', p1: { x: 0, y: 0 }, p2: { x: 0, y: 40 }, value: 5 },
@@ -288,6 +299,73 @@ test('电流源注入电阻网络的电压正确（i·R 关系）', () => {
   ];
   const { eng } = runSim(els, { dt: 1e-5, steps: 50 });
   assert.ok(Math.abs(vAt(eng, 0, 0) - 100) < 1e-6, `0.1A×1kΩ 节点电压 ${vAt(eng, 0, 0)}V 应≈100V`);
+});
+
+// ---------- 网络标签 / 二极管阈值 / 定时开关 / 拐点交叉 ----------
+test('同名端子（网络标签）跨区域电气相连', () => {
+  const els = [
+    { id: 'v1', type: 'voltage', p1: { x: 0, y: 0 }, p2: { x: 0, y: 40 }, value: 5 },
+    { id: 'r1', type: 'resistor', p1: { x: 0, y: 0 }, p2: { x: 40, y: 0 }, value: 1000 },
+    { id: 't1', type: 'terminal', name: 'VCC', p1: { x: 40, y: 0 }, p2: { x: 40, y: 0 } },
+    { id: 't2', type: 'terminal', name: 'VCC', p1: { x: 80, y: 40 }, p2: { x: 80, y: 40 } },
+    { id: 'r2', type: 'resistor', p1: { x: 80, y: 40 }, p2: { x: 120, y: 40 }, value: 1000 },
+    { id: 'w1', type: 'wire', p1: { x: 120, y: 40 }, p2: { x: 120, y: 80 } },
+    { id: 'g1', type: 'ground', p1: { x: 0, y: 40 } },
+    { id: 'g2', type: 'ground', p1: { x: 120, y: 80 } },
+  ];
+  const { eng } = runSim(els, { dt: 1e-5, steps: 10 });
+  // r1 与 r2 构成分压器：VCC = 5V × 1k/(1k+1k) = 2.5V，且两处同电位
+  assert.ok(Math.abs(vAt(eng, 40, 0) - 2.5) < 1e-6, `VCC 网络应≈2.5V，实际 ${vAt(eng, 40, 0)}`);
+  assert.ok(Math.abs(vAt(eng, 80, 40) - 2.5) < 1e-6, `远处同名端子应同电位，实际 ${vAt(eng, 80, 40)}`);
+});
+
+test('二极管导通阈值：0.5V 截止，1V 导通并产生压降', () => {
+  const mk = (vSrc) => [
+    { id: 'v1', type: 'voltage', p1: { x: 0, y: 0 }, p2: { x: 0, y: 40 }, value: vSrc },
+    { id: 'r1', type: 'resistor', p1: { x: 0, y: 0 }, p2: { x: 40, y: 0 }, value: 100 },
+    { id: 'd1', type: 'diode', p1: { x: 40, y: 0 }, p2: { x: 80, y: 0 } },
+    { id: 'r2', type: 'resistor', p1: { x: 80, y: 0 }, p2: { x: 80, y: 40 }, value: 1000 },
+    { id: 'w1', type: 'wire', p1: { x: 80, y: 40 }, p2: { x: 0, y: 40 } },
+    { id: 'g1', type: 'ground', p1: { x: 0, y: 40 } },
+  ];
+  const off = runSim(mk(0.5), { dt: 1e-5, steps: 200 });
+  assert.ok(vAt(off.eng, 80, 0) < 1e-3, `0.5V 应不足以导通二极管，实际 ${vAt(off.eng, 80, 0)}V`);
+  const on = runSim(mk(1.0), { dt: 1e-5, steps: 200 });
+  const vOut = vAt(on.eng, 80, 0);
+  assert.ok(vOut > 0.2 && vOut < 0.35, `1V 导通后输出应≈(1-0.7)×分压 ≈0.27V，实际 ${vOut}V`);
+});
+
+test('定时开关按时序精确通断', () => {
+  const els = [
+    { id: 'v1', type: 'voltage', p1: { x: 0, y: 0 }, p2: { x: 0, y: 40 }, value: 5 },
+    { id: 'w1', type: 'wire', p1: { x: 0, y: 0 }, p2: { x: 40, y: 0 } },
+    { id: 'sw1', type: 'switch', control: 'time', timeOn: 0.01, timeOff: 0.02, state: true, p1: { x: 40, y: 0 }, p2: { x: 80, y: 0 } },
+    { id: 'r1', type: 'resistor', p1: { x: 80, y: 0 }, p2: { x: 80, y: 40 }, value: 1000 },
+    { id: 'w2', type: 'wire', p1: { x: 80, y: 40 }, p2: { x: 0, y: 40 } },
+    { id: 'g1', type: 'ground', p1: { x: 0, y: 40 } },
+  ];
+  const { eng } = runSim(els, { dt: 1e-5, steps: 3000 });
+  // 初始时刻 timeOn 未到 → 断开（断开时经 1e8Ω 泄漏 <50µV）；10ms 闭合；20ms 断开
+  assert.ok(Math.abs(vAt(eng, 80, 0)) < 1e-3, `t=0~10ms 开关应断开，实际 ${vAt(eng, 80, 0)}V`);
+  const eng2 = runSim(els, { dt: 1e-5, steps: 1500 }).eng;
+  assert.ok(Math.abs(vAt(eng2, 80, 0) - 5) < 1e-3, `t=10~20ms 开关应闭合，实际 ${vAt(eng2, 80, 0)}V`);
+  const eng3 = runSim(els, { dt: 1e-5, steps: 3000 }).eng;
+  assert.ok(Math.abs(vAt(eng3, 80, 0)) < 1e-3, `t>20ms 开关应再次断开，实际 ${vAt(eng3, 80, 0)}V`);
+});
+
+test('拐点导线 (bend) 跨越干线自动成节点', () => {
+  const els = [
+    { id: 'v1', type: 'voltage', p1: { x: 0, y: 0 }, p2: { x: 0, y: 40 }, value: 5 },
+    { id: 'w1', type: 'wire', p1: { x: 0, y: 0 }, p2: { x: 100, y: 0 } },
+    { id: 'w2', type: 'wire', p1: { x: 40, y: -40 }, bend: { x: 80, y: -40 }, p2: { x: 80, y: 20 } }, // 第二段在 (80,0) 跨越
+    { id: 'r1', type: 'resistor', p1: { x: 100, y: 0 }, p2: { x: 100, y: 40 }, value: 1000 },
+    { id: 'w3', type: 'wire', p1: { x: 100, y: 40 }, p2: { x: 0, y: 40 } },
+    { id: 'g1', type: 'ground', p1: { x: 0, y: 40 } },
+  ];
+  const { eng } = runSim(els, { dt: 1e-5, steps: 10 });
+  assert.ok(Math.abs(vEl(eng, 'r1') - 5) < 1e-6, '负载压降应等于源电压');
+  assert.ok(Math.abs(vAt(eng, 40, -40) - 5) < 1e-6, `拐点导线跨越处上方应同电位，实际 ${vAt(eng, 40, -40)}`);
+  assert.ok(Math.abs(vAt(eng, 80, 20) - 5) < 1e-6, `拐点导线跨越处下方应同电位，实际 ${vAt(eng, 80, 20)}`);
 });
 
 // ---------- 全预置电路数值健全性 ----------
