@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🔌 Circuit Simulator | 在线电路仿真器
 
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
@@ -113,9 +114,43 @@ circuit-simulator/
 
 - **Node.js** 16.0 或更高版本
 - **npm** 或 **yarn**
+=======
+# Circuit Simulator · 电路模拟器
+
+一个基于 React 的交互式电路模拟器，支持实时瞬态仿真（改进节点分析法 MNA + 后向欧拉积分）、波形示波器、多信号源与常见元件建模。
+
+## ✨ 功能特性
+
+- **实时电路仿真**：MNA（改进节点分析法）+ 后向欧拉，3 档仿真精度（dt=100µs / 10µs / 1µs）与 0.1~3x 速度调节
+- **元件模型**：
+  - 电压源：直流 (DC) / 正弦 (AC) / 阶跃 (STEP) / 方波 (SQUARE) / 三角波 / 脉冲 (PULSE) / 指数 (EXP)
+  - 电流源（波形同上）、电阻、电容、电感（均采用精确的伴随模型）
+  - 二极管（0.7V 压降 + 50mΩ 内阻的理想开关模型，步内定点迭代收敛）
+  - 手动/定时开关、接地、接线端子、网络标签（同名自动相连）
+- **预定义教学电路（7 个）**：
+  - 半波整流与平滑滤波
+  - 全波整流桥与滤波
+  - RLC 串联阻尼振荡
+  - RC 充放电纹波（方波）
+  - 二极管双向限幅钳位
+  - 电感断电高压尖峰
+  - 电感续流二极管钳位（与尖峰实验对照）
+- **交互式编辑**：拖拽放置/移动元件、端点拖拽重新接线、正交直角布线（导线交叉自动成节点）、端点自动吸附、旋转、复制/粘贴/副本、撤销/重做（60 步）
+- **示波器**：时基（0.5~200ms）与 Y 轴幅度可调，电压/电流双通道，自动量程，V/div 刻度显示，实时读数
+- **仿真中实时交互**：点击手动开关通断、修改元件参数即时生效、节点电压标签实时刷新
+- **工程管理**：JSON 导入/导出（带数据校验）、浏览器本地多工程保存/加载
+
+## 🚀 安装和运行
+
+### 前置要求
+
+- Node.js 18 或更高（测试依赖内置 `node --test`）
+- npm
+>>>>>>> b30555c (feat: 全面重构电路模拟器)
 
 ### 安装和运行
 
+<<<<<<< HEAD
 ```bash
 # 1. 克隆仓库
 git clone https://github.com/xiaowei2025cqu23phy/circuit-simulator.git
@@ -146,15 +181,99 @@ npm run preview
 ```bash
 # 代码检查和格式化
 npm run lint
+=======
+```bash
+git clone https://github.com/xiaowei2025cqu23phy/circuit-simulator.git
+cd circuit-simulator
+npm install
+```
+
+### 开发与构建
+
+```bash
+npm run dev      # 启动开发服务器 http://localhost:5173
+npm test         # 运行仿真内核单元测试（22 项，含解析解对照）
+npm run lint     # ESLint 检查
+npm run build    # 生产构建
+npm run preview  # 预览生产构建
+```
+
+### 部署到 GitHub Pages
+
+```bash
+npm run deploy   # 构建并推送 dist 到 gh-pages 分支
+```
+
+## 📖 使用说明
+
+1. 从左侧工具栏选择元件，在画布上**按下并拖拽**即可放置
+2. 使用「选择」或「移动」工具拖拽元件调整位置，**拖拽元件端点可重新接线**
+3. 选择「导线」工具绘制连线：正交模式下自动直角拐弯，靠近端点自动吸附；导线交叉处自动形成节点
+4. 点击选中元件后，在左侧面板编辑参数（电阻/电容/电感、开关控制方式、信号源波形等）
+5. 放置「接地」元件（或命名端子/标签为 GND），点击「运行瞬态仿真」
+6. 仿真中：点击手动开关可通断，选中任意元件或端子即可在示波器查看其电压/电流波形
+
+### 快捷键
+
+| 快捷键 | 功能 |
+| --- | --- |
+| `Ctrl+Z` / `Ctrl+Y` | 撤销 / 重做 |
+| `Ctrl+C` / `Ctrl+V` | 复制 / 粘贴 |
+| `Ctrl+D` | 复制副本（偏移 40px） |
+| `Delete` | 删除选中元件 |
+| `Esc` | 取消绘制 / 取消选择 / 关闭弹窗 |
+| `Ctrl+S` | 保存到本地工程 |
+| 右键拖拽 | 平移视图 |
+| 滚轮 | 以光标为中心缩放 |
+
+## 🧪 算法与测试
+
+仿真内核为纯 JavaScript 模块（`src/sim/engine.js`），不依赖 React，可直接单元测试：
+
+- **MNA 建模**：电阻/电容（后向欧拉伴随模型）/电感（支路电流未知量）/二极管（理想开关）/开关，电流源与电压源正确装配
+- **拓扑合并**：并查集合并导线（含拐点）、同名标签、端子与接地；导线交叉点自动成节点；悬空节点/悬空导线/缺少接地均给出明确报错
+- **数值求解**：部分主元 Gauss-Jordan 求逆，对角 GMIN 保证可解性
+- **22 项单元测试**覆盖：RC/RLC/电感稳态的解析解对照、整流/桥式/钳位/尖峰/续流等电路行为、全部波形发生器、节点合并、矩阵求逆、参数清洗与错误检测
+
+```bash
+npm test
+```
+
+## 🗂 项目结构
+
+```
+src/
+├── App.jsx              # 主界面（画布、示波器、属性面板、工程管理）
+├── sim/
+│   ├── engine.js        # 仿真内核（MNA + 后向欧拉，纯 JS）
+│   ├── circuits.js      # 预置教学电路
+│   ├── format.js        # SI 数值/电压/电流/时间格式化
+│   └── engine.test.mjs  # 内核单元测试
+└── main.jsx / index.css
+```
+
+## 🔒 安全说明
+
+本项目为纯前端应用，**不包含任何 API 密钥、令牌或敏感配置**；`.gitignore` 已覆盖 `.env*`、私钥等常见敏感文件，提交前请再次确认。
+>>>>>>> b30555c (feat: 全面重构电路模拟器)
 
 # 部署到 GitHub Pages（如果配置了）
 npm run deploy
 ```
 
+<<<<<<< HEAD
 ---
+=======
+- **前端框架**: React 19
+- **构建工具**: Vite 8
+- **样式**: Tailwind CSS 3
+- **图标**: Lucide React
+- **代码检查**: ESLint 9
+>>>>>>> b30555c (feat: 全面重构电路模拟器)
 
 ## 📖 使用指南
 
+<<<<<<< HEAD
 ### 基础操作
 
 #### 1️⃣ **添加元件**
@@ -210,10 +329,27 @@ Ctrl+Y    重做已撤销的操作
 ```
 在参数面板中输入新值后，实时预览波形变化
 ```
+=======
+本项目使用了以下开源模块，除注明外均采用 MIT 许可证：
+
+- **React / React DOM** (v19.2.5) - Copyright (c) Meta (Facebook) · MIT
+- **Lucide React** (v1.8.0) - Copyright (c) Lucide Contributors · MIT
+- **Vite** (v8.0.9) - Copyright (c) 2019-present, Yuxi (Evan You) and Vite contributors · MIT
+- **Tailwind CSS** (v3.4.19) - Copyright (c) Tailwind Labs, Inc · MIT
+- **ESLint** (v9.39.4) - Copyright (c) OpenJS Foundation and other contributors · MIT
+- **Autoprefixer / PostCSS** - Copyright (c) Andrey Sitnik and other contributors · MIT
+- **gh-pages** (v6.3.0) - Copyright (c) Ryan Canning · MIT
+
+所有依赖模块的完整许可证文本可在各自仓库中查看。
+>>>>>>> b30555c (feat: 全面重构电路模拟器)
 
 ---
 
+<<<<<<< HEAD
 ## 🛠️ 技术栈
+=======
+本项目采用 GPL-3.0 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+>>>>>>> b30555c (feat: 全面重构电路模拟器)
 
 | 技术 | 版本 | 用途 |
 |------|------|------|

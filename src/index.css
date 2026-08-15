@@ -6,3 +6,19 @@ body {
   margin: 0;
   overflow: hidden;
 }
+
+/* 细滚动条（侧边栏/帮助面板） */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

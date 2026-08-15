@@ -7,12 +7,25 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# 依赖与构建产物
 node_modules
 dist
 dist-ssr
 *.local
 
-# Editor directories and files
+# 环境变量与密钥（严禁提交！）
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+credentials*
+
+# 编辑器与系统文件
 .vscode/*
 !.vscode/extensions.json
 .idea
