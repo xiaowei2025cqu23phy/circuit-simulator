@@ -3,7 +3,7 @@ import {
   MousePointer2, Minus, Zap, Activity, Trash2, Play, AlertCircle,
   RotateCw, Tag, GitCommit, LineChart, StopCircle, ArrowRight,
   TriangleRight, ToggleLeft, Download, Upload, ZoomIn, ZoomOut, Move, Trash,
-  CircleDot, Pause, Save, FolderOpen, Undo2, Redo2, HelpCircle, Route, Home, Copy, Plus, X
+  CircleDot, Pause, Save, FolderOpen, Undo2, Redo2, HelpCircle, Route, Home, Copy, Plus, X, Menu
 } from 'lucide-react';
 import { compileCircuit, stepEngine, sanitizeElements, nextId, getSourceValue } from './sim/engine.js';
 import { PREDEFINED_CIRCUITS } from './sim/circuits.js';
@@ -418,6 +418,8 @@ export default function CircuitSimulator() {
   const [isOrthogonal, setIsOrthogonal] = useState(true);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [isPanning, setIsPanning] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isScopeOpen, setIsScopeOpen] = useState(false);
 
   const [isSimulating, setIsSimulating] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -1191,14 +1193,18 @@ export default function CircuitSimulator() {
   const selectedEl = elements.find(e => e.id === selectedElementId) || null;
 
   return (
-    <div className="flex h-screen w-full bg-gray-100 text-gray-800 font-sans overflow-hidden">
-      {/* ======== 侧边栏 ======== */}
-      <div className="w-72 bg-white border-r border-gray-200 flex flex-col shadow-sm z-20 shrink-0">
+    <div className="relative flex h-[100dvh] min-h-0 w-full overflow-hidden bg-gray-100 text-gray-800 font-sans">
+      {/* 移动端侧栏遮罩 */}
+      {isMobileSidebarOpen && <button aria-label="关闭工具面板" onClick={() => setIsMobileSidebarOpen(false)} className="fixed inset-0 z-30 bg-slate-950/35 md:hidden" />}
+
+      {/* ======== 侧边栏：PC 常驻，移动端抽屉 ======== */}
+      <div className={`mobile-sidebar fixed inset-y-0 left-0 z-40 flex w-[min(88vw,22rem)] max-w-full flex-col bg-white shadow-2xl transition-transform duration-200 md:relative md:z-20 md:w-72 md:translate-x-0 md:shrink-0 md:border-r md:border-gray-200 ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white flex justify-between items-center">
           <div>
             <h1 className="text-lg font-bold flex items-center gap-2"><Activity size={20} /> 电路仿真 · EDA 工作台</h1>
             <p className="text-xs text-indigo-200 mt-0.5">MNA 瞬态分析 · Workspace & DSO Scope</p>
           </div>
+          <button onClick={() => setIsMobileSidebarOpen(false)} aria-label="关闭工具面板" className="rounded p-2 text-indigo-100 hover:bg-indigo-500 md:hidden"><X size={18} /></button>
         </div>
 
         {/* 本地项目管理器 */}
@@ -1247,7 +1253,7 @@ export default function CircuitSimulator() {
           <div className={`space-y-1 mb-5 ${isSimulating ? 'opacity-50 pointer-events-none' : ''}`}>
             {tools.map(tool => (
               <button key={tool.id} title={TOOL_HINTS[tool.id]}
-                onClick={() => { setSelectedTool(tool.id); setSelectedElementId(null); setDrawingState(null); }}
+                onClick={() => { setSelectedTool(tool.id); setSelectedElementId(null); setDrawingState(null); setIsMobileSidebarOpen(false); }}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${selectedTool === tool.id ? 'bg-indigo-100 text-indigo-800 font-medium shadow-inner' : 'hover:bg-gray-100 text-gray-600'}`}>
                 {tool.icon} {tool.name}
               </button>
@@ -1359,10 +1365,20 @@ export default function CircuitSimulator() {
       </div>
 
       {/* ======== 画布区 ======== */}
-      <div className="flex-1 flex flex-col relative overflow-hidden bg-[length:20px_20px] select-none" style={{ backgroundImage: 'radial-gradient(#d1d5db 1px, transparent 1px)' }}>
+      <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-[length:20px_20px] select-none" style={{ backgroundImage: 'radial-gradient(#d1d5db 1px, transparent 1px)' }}>
+        {/* 移动端顶部操作栏 */}
+        <div className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 bg-white/95 px-3 shadow-sm backdrop-blur md:hidden">
+          <button onClick={() => setIsMobileSidebarOpen(true)} aria-label="打开工具面板" className="rounded-lg p-2 text-gray-700 hover:bg-gray-100"><Menu size={20} /></button>
+          <div className="min-w-0 text-center">
+            <div className="truncate text-sm font-bold text-gray-800">电路仿真工作台</div>
+            <div className="text-[10px] text-gray-500">{selectedEl ? `探测 ${selectedEl.name || selectedEl.type}` : '选择元件开始编辑'}</div>
+          </div>
+          <button onClick={() => setShowHelp(true)} aria-label="打开帮助" className="rounded-lg p-2 text-gray-700 hover:bg-gray-100"><HelpCircle size={19} /></button>
+        </div>
+
         {/* 画布工具栏 */}
-        <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
-          <div className="flex gap-1 bg-white/90 p-1.5 rounded-lg shadow-sm border border-gray-200 backdrop-blur">
+        <div className="absolute left-2 right-2 top-[4.5rem] z-20 flex flex-col gap-2 md:left-4 md:right-auto md:top-4">
+          <div className="canvas-toolbar flex max-w-full gap-1 overflow-x-auto rounded-lg border border-gray-200 bg-white/90 p-1.5 shadow-sm backdrop-blur">
             <button onClick={undo} disabled={!undoStack.length} title="撤销 (Ctrl+Z)" className="p-1.5 hover:bg-gray-100 rounded text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"><Undo2 size={16} /></button>
             <button onClick={redo} disabled={!redoStack.length} title="重做 (Ctrl+Y)" className="p-1.5 hover:bg-gray-100 rounded text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"><Redo2 size={16} /></button>
             <span className="w-px bg-gray-200 mx-1" />
@@ -1397,7 +1413,7 @@ export default function CircuitSimulator() {
         )}
 
         {/* 画布 SVG */}
-        <div className="relative flex-1 circuit-canvas-layer">
+        <div className="relative min-h-0 flex-1 circuit-canvas-layer">
           <svg ref={svgRef}
             className={`w-full h-full touch-none ${isPanning ? 'cursor-grabbing' : isSimulating ? 'cursor-crosshair' : selectedTool === 'move' ? 'cursor-move' : 'cursor-default'}`}
             onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp}
@@ -1430,15 +1446,28 @@ export default function CircuitSimulator() {
               ))}
             </g>
           </svg>
+          {/* 移动端常用工具快捷栏 */}
+          {!isSimulating && (
+            <div className="absolute bottom-2 left-2 right-2 z-20 flex items-center justify-between gap-1 overflow-x-auto rounded-xl border border-gray-200 bg-white/95 p-1.5 shadow-lg backdrop-blur md:hidden">
+              {tools.filter(tool => ['select', 'move', 'wire', 'resistor', 'voltage', 'ground'].includes(tool.id)).map(tool => (
+                <button key={`mobile-${tool.id}`} onClick={() => { setSelectedTool(tool.id); setSelectedElementId(null); setDrawingState(null); }} aria-label={tool.name}
+                  className={`flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-2 text-[10px] ${selectedTool === tool.id ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+                  {tool.icon}<span>{tool.name.split(' ')[0]}</span>
+                </button>
+              ))}
+              <button onClick={() => setIsMobileSidebarOpen(true)} aria-label="打开全部工具" className="flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-2 text-[10px] text-gray-600 hover:bg-gray-100"><Menu size={16} /><span>全部</span></button>
+            </div>
+          )}
         </div>
 
         {/* ======== 示波器 ======== */}
-        <div className={`h-64 bg-gray-900 border-t-4 ${isSimulating ? (isPaused ? 'border-amber-500' : 'border-indigo-500') : 'border-gray-700'} flex flex-col shrink-0 transition-colors z-20`}>
-          <div className="flex justify-between items-center px-4 py-2 bg-gray-800 text-gray-300 text-xs">
-            <div className="flex items-center">
+        <div className={`${isScopeOpen ? 'h-64' : 'h-11'} md:h-64 overflow-hidden bg-gray-900 border-t-4 ${isSimulating ? (isPaused ? 'border-amber-500' : 'border-indigo-500') : 'border-gray-700'} flex shrink-0 flex-col transition-[height] duration-200 z-20`}>
+          <div className="flex min-h-10 flex-wrap items-center justify-between gap-2 bg-gray-800 px-3 py-2 text-xs text-gray-300 md:px-4">
+            <div className="flex min-w-0 items-center">
+              <button onClick={() => setIsScopeOpen(v => !v)} aria-label={isScopeOpen ? '折叠示波器' : '展开示波器'} className="mr-2 rounded p-1 text-gray-400 hover:bg-gray-700 hover:text-white md:hidden">{isScopeOpen ? <Minus size={15} /> : <Plus size={15} />}</button>
               <span className="font-semibold uppercase flex items-center gap-2 text-white"><LineChart size={14} /> {selectedEl ? `探测: [${selectedEl.name || '未命名'}]` : '示波器'}</span>
               {selectedEl && (
-                <div className="flex gap-5 ml-4 border-l border-gray-600 pl-4">
+                <div className={`${isScopeOpen ? 'flex' : 'hidden'} gap-5 ml-4 border-l border-gray-600 pl-4 md:flex`}>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <span className="text-[10px] text-gray-400">X轴 时基:</span>
                     <input type="range" min="1" max="200" step="1" value={scopeConfig.timebaseMs} onChange={e => updateScope({ timebaseMs: Number(e.target.value) })} className="w-24 h-1 bg-gray-600 rounded appearance-none cursor-pointer accent-indigo-400" />
@@ -1452,11 +1481,11 @@ export default function CircuitSimulator() {
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 md:gap-4">
               {isPaused && <span className="bg-amber-500 text-white px-2 py-0.5 rounded text-[10px] font-bold tracking-wider animate-pulse">PAUSED</span>}
-              {simInfo && <span className="text-[10px] text-gray-400 font-mono">dt={formatTime(simInfo.dt)} · 节点 {simInfo.N} · 支路 {simInfo.M}</span>}
-              <span className="flex items-center gap-1 text-[10px]"><span className="w-2 h-2 rounded-full bg-sky-400 inline-block"></span> 电压 V</span>
-              <span className="flex items-center gap-1 text-[10px]"><span className="w-2 h-2 rounded-full bg-red-400 inline-block"></span> 电流 A</span>
+              {simInfo && <span className="hidden text-[10px] text-gray-400 font-mono sm:inline">dt={formatTime(simInfo.dt)} · 节点 {simInfo.N} · 支路 {simInfo.M}</span>}
+              <span className="hidden items-center gap-1 text-[10px] sm:flex"><span className="w-2 h-2 rounded-full bg-sky-400 inline-block"></span> 电压 V</span>
+              <span className="hidden items-center gap-1 text-[10px] sm:flex"><span className="w-2 h-2 rounded-full bg-red-400 inline-block"></span> 电流 A</span>
               <span className="text-gray-400 font-mono w-20 text-right text-[10px]">t: {(uiSimData.time * 1000).toFixed(1)}ms</span>
             </div>
           </div>
@@ -1467,8 +1496,8 @@ export default function CircuitSimulator() {
 
         {/* 导入/导出弹窗 */}
         {ioModal && (
-          <div className="absolute inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
-            <div className="bg-white p-5 rounded-xl shadow-2xl w-[500px] flex flex-col gap-3">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="w-[min(500px,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-2xl flex flex-col gap-3">
               <h3 className="font-bold text-lg">{ioModal === 'export' ? '导出电路 JSON' : '粘贴 JSON 代码导入'}</h3>
               <textarea className="w-full h-64 border rounded p-2 text-xs font-mono bg-gray-50 focus:ring-2 outline-none" value={ioData} onChange={e => setIoData(e.target.value)} readOnly={ioModal === 'export'} placeholder='[{"id":"r1","type":"resistor",...}]' />
               <div className="flex justify-end gap-2 mt-2">
@@ -1481,8 +1510,8 @@ export default function CircuitSimulator() {
 
         {/* 通用确认/提示弹窗 */}
         {modalConfig && (
-          <div className="absolute inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
-            <div className="bg-white p-5 rounded-xl shadow-2xl w-[400px] flex flex-col gap-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="w-[min(400px,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-2xl flex flex-col gap-4">
               <h3 className="font-bold text-lg text-gray-800">{modalConfig.title}</h3>
               <p className="text-sm text-gray-600 whitespace-pre-line">{modalConfig.message}</p>
               {modalConfig.type === 'prompt' && (
@@ -1507,8 +1536,8 @@ export default function CircuitSimulator() {
 
         {/* 帮助弹窗 */}
         {showHelp && (
-          <div className="absolute inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
-            <div className="bg-white p-6 rounded-xl shadow-2xl w-[560px] max-h-[80vh] overflow-y-auto flex flex-col gap-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="w-[min(560px,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-xl bg-white p-6 shadow-2xl flex flex-col gap-4">
               <div className="flex justify-between items-center">
                 <h3 className="font-bold text-lg text-gray-800">📖 使用帮助</h3>
                 <button onClick={() => setShowHelp(false)} className="p-1 hover:bg-gray-100 rounded text-gray-500"><X size={18} /></button>
