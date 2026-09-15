@@ -419,7 +419,7 @@ export default function CircuitSimulator() {
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [isPanning, setIsPanning] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [isScopeOpen, setIsScopeOpen] = useState(false);
+  const [isScopeOpen, setIsScopeOpen] = useState(true);
 
   const [isSimulating, setIsSimulating] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
