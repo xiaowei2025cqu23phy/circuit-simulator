@@ -12,7 +12,7 @@
 //  - 开关:    闭合 0.01Ω / 断开 1e8Ω
 // ============================================================
 
-export const GMIN = 1e-12;          // 对角最小电导 (保证矩阵非奇异)
+export const GMIN = 1e-12;          // 对地弱电导（不保证任意 MNA 系统可逆）
 export const DEFAULT_DT = 1e-5;     // 默认仿真步长 10µs
 export const HISTORY_MAX = 250000;  // 波形历史最大点数
 import { predictDiodeStates, countDiodeStateDisagreements } from './statePrediction.js';
@@ -446,7 +446,10 @@ export function stepEngine(eng, probeId = null) {
     eng.diagnostics.stateDisagreements += countDiodeStateDisagreements(validEls, switchStates, x);
   } else {
   let converged = false;
+  let statesUsedForLastSolve = null;
   for (let iter = 0; iter < 12; iter++) {
+    // Snapshot before assembling: the solution corresponds to THESE states.
+    statesUsedForLastSolve = { ...switchStates };
     x = assembleAndSolve();
     let changed = false;
     validEls.forEach(el => {
@@ -466,10 +469,14 @@ export function stepEngine(eng, probeId = null) {
     converged = true;
     break;
   }
-  // 不应使用与最终状态不一致的电压进行历史状态更新。
+  // A hard-switch model may have no consistent discrete state near its
+  // boundary. Keep the last SOLVED matrix/solution pair together rather than
+  // silently using a voltage calculated from the previous state.
+  // Preserve the legacy time-stepping API; expose the warning for research.
   if (!converged) {
     eng.diagnostics.unresolvedSteps += 1;
-    throw new Error('二极管步内状态迭代未在 12 次内收敛');
+    Object.assign(switchStates, statesUsedForLastSolve);
+    eng.needsMatrixRebuild = false;
   }
   }
   eng.previousSolution = x.slice();
