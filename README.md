@@ -23,8 +23,8 @@
 - **键盘快捷键** - Q/M/W/R/C/L/D/S/V/I/G/T/N/X 一键切换工具
 
 ### 🧮 仿真引擎
-- **改进的节点分析法（MNA）** - 部分主元高斯消元求解，对角 GMIN 保证数值稳定
-- **后向欧拉积分** - 电容/电感采用精确伴随模型，无条件稳定
+- **修正节点分析法（MNA）** - 当前采用带部分主元的 Gauss–Jordan 逆矩阵与矩阵向量乘法；GMIN 仅缓解部分病态情形，并不保证任意拓扑可逆
+- **后向欧拉积分** - 电容/电感采用一阶伴随模型；该积分法对适用的线性测试问题具有 A 稳定性，但不保证整个开关电路总是稳定
 - **多种源类型支持**:
   - DC 电源、AC 正弦波源（可设初相位）、阶跃 (STEP)
   - 方波（可设占空比）、三角波、脉冲波、指数波
@@ -98,7 +98,7 @@ circuit-simulator/
 
 #### 🧮 求解器
 - 部分主元 Gauss-Jordan 求逆（编译时一次求逆，逐时间步 O(n²) 矩阵乘）
-- 对角 GMIN（1e-12）保证可解性，奇异矩阵给出明确报错
+- 节点 GMIN（1e-12 S）提供弱对地连接，但不保证所有 MNA 系统可逆；奇异矩阵需要单独检测
 
 #### 🎨 绘图系统
 - SVG 元件渲染（memo 优化）+ Canvas 示波器（HiDPI、抽稀采样）
@@ -350,3 +350,25 @@ npm test
 - 📧 **Email**: [cqu.phy.23xiaowei@qq.com](mailto:cqu.phy.23xiaowei@qq.com)
 - 🐛 **提交 Issue**: [GitHub Issues](https://github.com/xiaowei2025cqu23phy/circuit-simulator/issues)
 - 💡 **讨论**: [GitHub Discussions](https://github.com/xiaowei2025cqu23phy/circuit-simulator/discussions)
+
+
+---
+
+## 🔬 HSP-MNA 研究模式（独立分支）
+
+研究分支 `research/hsp-mna-validation` 增加了**可选**的双阈值历史预测模式；默认仍是现有的二极管步内校正迭代器。
+
+```js
+const baseline = compileCircuit(elements, dt); // 默认：步内二极管状态校正
+const experimental = compileCircuit(elements, dt, { diodeSolver: 'predicted' }); // 历史预测，每步一次线性求解
+stepEngine(experimental);
+console.log(experimental.diagnostics);
+```
+
+- 双阈值预测为 0.70 V（由 OFF 转 ON）与 0.65 V（由 ON 转 OFF），使用上一时间步**已接受的节点解**决定本步离散状态；这与真实二极管物理模型不等价。
+- `engine.diagnostics` 记录求解次数、矩阵重构次数、未解决的状态迭代次数以及预测态的不一致计数。
+- 研究用对照脚本：`node scripts/compare-hsp-mna.mjs > comparison.csv`。
+- 电路仍只有二极管和手动/定时开关；论文中 BJT/MOSFET 的表达目前属于**模型设计与理论推导**，不是当前 JavaScript 引擎中已实现的器件。
+- 研究模式的误差与计算收益必须用同一器件模型及时间网格进行对照验证；不应从单次求解特性直接宣称实际速度提升。由于 GitHub Actions 账户配额限制，CI 运行状态并不代表代码测试结果，请本地执行 `npm test`、`npm run lint`、`npm run build`。
+
+详见 [HSP-MNA 研究方法说明](docs/hsp-mna-research.md)。
