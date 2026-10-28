@@ -1,0 +1,22 @@
+name: Simulation checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - research/hsp-mna-validation
+
+jobs:
+  validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run lint
+      - run: npm run build
