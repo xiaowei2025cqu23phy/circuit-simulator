@@ -15,6 +15,7 @@
 export const GMIN = 1e-12;          // 对角最小电导 (保证矩阵非奇异)
 export const DEFAULT_DT = 1e-5;     // 默认仿真步长 10µs
 export const HISTORY_MAX = 250000;  // 波形历史最大点数
+import { predictDiodeStates, countDiodeStateDisagreements } from './statePrediction.js';
 
 // ---------- 并查集：导线/标签/接地节点合并 ----------
 export class DSU {
@@ -239,7 +240,9 @@ function segIntersect(a1, a2, b1, b2) {
   return { x: a1.x + t * d1x, y: a1.y + t * d1y };
 }
 
-export function compileCircuit(els, dt = DEFAULT_DT) {
+export function compileCircuit(els, dt = DEFAULT_DT, options = {}) {
+  const diodeSolver = options.diodeSolver ?? 'iterative';
+  if (!['iterative', 'predicted'].includes(diodeSolver)) throw new Error('未知二极管求解模式');
   const dsu = new DSU();
   let hasGround = false;
   const labelsByText = {};
@@ -373,6 +376,8 @@ export function compileCircuit(els, dt = DEFAULT_DT) {
     dt, t: 0, size, N, M, A_inv, validEls, branchEls, branchMap, dsu, nodeMap, finalGroundRoot,
     state: {}, history: [], currentNodes: {}, allEls: engineEls, switchStates,
     needsMatrixRebuild: false, lastMeasured: null, lastUiTime: 0,
+    diodeSolver, previousSolution: null,
+    diagnostics: { steps: 0, linearSolves: 0, matrixRebuilds: 0, stateDisagreements: 0, unresolvedSteps: 0 },
   };
 }
 
@@ -395,7 +400,9 @@ export function stepEngine(eng, probeId = null) {
     if (eng.needsMatrixRebuild) {
       const A_new = buildMNA(eng.N, eng.M, dt, validEls, eng.branchEls, switchStates);
       const inv = invertMatrix(A_new);
-      if (inv) eng.A_inv = inv;
+      if (!inv) throw new Error('状态切换后 MNA 矩阵不可逆，已停止仿真');
+      eng.A_inv = inv;
+      eng.diagnostics.matrixRebuilds += 1;
       eng.needsMatrixRebuild = false;
     }
     const b = Array(size).fill(0);
@@ -426,10 +433,19 @@ export function stepEngine(eng, probeId = null) {
       for (let j = 0; j < size; j++) sum += eng.A_inv[i][j] * b[j];
       x[i] = sum;
     }
+    eng.diagnostics.linearSolves += 1;
     return x;
   };
 
   let x = null;
+  if (eng.diodeSolver === 'predicted') {
+    // 单步外推：在求解前使用上一时间步接受的电压判定状态。
+    const changed = predictDiodeStates(validEls, switchStates, eng.previousSolution);
+    if (changed) eng.needsMatrixRebuild = true;
+    x = assembleAndSolve();
+    eng.diagnostics.stateDisagreements += countDiodeStateDisagreements(validEls, switchStates, x);
+  } else {
+  let converged = false;
   for (let iter = 0; iter < 12; iter++) {
     x = assembleAndSolve();
     let changed = false;
@@ -447,8 +463,17 @@ export function stepEngine(eng, probeId = null) {
       }
     });
     if (changed) { eng.needsMatrixRebuild = true; continue; }
+    converged = true;
     break;
   }
+  // 不应使用与最终状态不一致的电压进行历史状态更新。
+  if (!converged) {
+    eng.diagnostics.unresolvedSteps += 1;
+    throw new Error('二极管步内状态迭代未在 12 次内收敛');
+  }
+  }
+  eng.previousSolution = x.slice();
+  eng.diagnostics.steps += 1;
 
   // 3) 测量与状态更新
   let measuredV = 0, measuredI = 0;
@@ -463,7 +488,7 @@ export function stepEngine(eng, probeId = null) {
     else if (type === 'resistor') i_elem = v_elem / (Number(value) || 1e-3);
     else if (type === 'current') i_elem = getSourceValue(el, eng.t);
     else if (type === 'diode' || type === 'switch') {
-      const g = switchStates[id] ? 1.0 / 0.05 : 1e-8;
+      const g = switchStates[id] ? 1.0 / (type === 'switch' ? 0.01 : 0.05) : 1e-8;
       i_elem = v_elem * g;
       if (type === 'diode' && switchStates[id]) i_elem -= 0.7 * g;
     }
