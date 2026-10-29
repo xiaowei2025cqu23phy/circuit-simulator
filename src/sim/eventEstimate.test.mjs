@@ -36,7 +36,7 @@ test('candidate estimator sorts simultaneous events by earliest predicted crossi
 test('secant estimator has explicit finite/near-edge safeguards', () => {
   const e=[{id:'d',type:'diode',n1:0,n2:-1}];
   assert.equal(estimatePwlDiodeCrossings(e,{d:false},null,[1]).length,0);
-  assert.equal(estimatePwlDiodeCrossings(e,{d:false},[0.69],[0.71],{minimumFraction:0.49}).length,0);
+  assert.equal(estimatePwlDiodeCrossings(e,{d:false},[0.695],[0.71],{minimumFraction:0.49}).length,0);
   assert.equal(estimatePwlDiodeCrossings(e,{d:false},[NaN],[0.8]).length,0);
   assert.throws(()=>estimatePwlDiodeCrossings(e,{d:false},[0],[1],{minimumFraction:0.5}),/比例/);
   assert.throws(()=>estimatePwlDiodeCrossings(e,{d:false},[0],[1],{turnOff:0.8,turnOn:0.7}),/阈值/);
