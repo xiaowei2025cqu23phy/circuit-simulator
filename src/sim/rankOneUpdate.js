@@ -12,7 +12,7 @@
  * request a full matrix inverse instead of using a dubious update.
  */
 export function updateInverseForConductanceBranch(inverse, n1, n2, deltaG, {
-  relativeDenominatorFloor = 1e-8,
+  relativeDenominatorFloor = 1e-6,
 } = {}) {
   const n=inverse.length;
   if (!Number.isFinite(deltaG)) throw new Error('导纳改变量必须有限');
