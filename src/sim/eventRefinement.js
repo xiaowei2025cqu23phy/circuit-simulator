@@ -11,7 +11,7 @@ import { stepEngine, HISTORY_MAX } from './engine.js';
 const cloneDiagnostics = d => ({ ...d });
 const DIODE_SOLVERS = new Set(['hysteretic-corrected', 'adaptive', 'guarded']);
 
-function snapshotEngine(e) {
+export function snapshotEngine(e) {
   const longHistory = e.history.length >= HISTORY_MAX ? e.history.slice() : null;
   return {
     t: e.t,
@@ -28,10 +28,11 @@ function snapshotEngine(e) {
     longHistory,
     lastMeasured: e.lastMeasured,
     eventAwareTime: e.eventAwareTime,
+    diodeSolver: e.diodeSolver,
     diagnostics: cloneDiagnostics(e.diagnostics),
   };
 }
-function restoreEngine(e, s) {
+export function restoreEngine(e, s) {
   e.t = s.t;
   e.dt = s.dt;
   e.state = s.state;
@@ -45,6 +46,7 @@ function restoreEngine(e, s) {
   if (!s.longHistory) e.history.length = s.historyLength;
   e.lastMeasured = s.lastMeasured;
   e.eventAwareTime = s.eventAwareTime;
+  e.diodeSolver = s.diodeSolver;
   e.diagnostics = cloneDiagnostics(s.diagnostics);
 }
 
