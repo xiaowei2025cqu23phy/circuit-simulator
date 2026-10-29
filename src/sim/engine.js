@@ -629,8 +629,14 @@ export function stepEngineAtScheduledEvents(eng, probeId = null) {
     eng.dt = stepDt;
     eng.needsMatrixRebuild = true;
   }
+  const previousBoundarySemantics = eng.eventAwareTime;
   eng.eventAwareTime = true;
-  stepEngine(eng, probeId);
+  try {
+    stepEngine(eng, probeId);
+  } finally {
+    // The wrapper must not silently alter later calls to the ordinary API.
+    eng.eventAwareTime = previousBoundarySemantics;
+  }
   if (stepDt < baseDt - tol) eng.diagnostics.alignedTimeEvents += 1;
   return stepDt;
 }
