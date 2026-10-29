@@ -1,3 +1,5 @@
+> **历史数据警示（2026-10-29）：**本文件 48 组实验来自 `legacy-start` 独立源采样。新四策略 BE-end 结果与自适应扫描见 [修订后的新表](../research/four_mode_be_end_v8_results.csv) 和 [最新参数扫描](../research/adaptive_scale_be_end_v8_results.csv)。请以 [第六轮勘误](sixth-round-events-time-discretization.md) 解释数值变化。
+
 # 第四轮：基于二极管端电压跃变的自适应状态校正
 
 更新时间：2026-10-29。本文档记录*研究分支真实 JavaScript 核心*的数值实验，而非网页 FPS、工业 SPICE 验证或硬件波形测量。
