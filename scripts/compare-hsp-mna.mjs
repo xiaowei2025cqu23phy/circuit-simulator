@@ -1,5 +1,7 @@
-// Reproducible algorithm-side comparison. No claims of speedup without a run.
-// Usage: node scripts/compare-hsp-mna.mjs > comparison.csv
+// Reproducible comparison of three methods under ONE hysteretic PWL law.
+// `node scripts/compare-hsp-mna.mjs > results.csv`
+// No SPICE validation is implied; the fine-grid reference uses the same PWL
+// device model and endpoint-corrected algorithm, only a smaller time step.
 import { performance } from 'node:perf_hooks';
 import { compileCircuit, stepEngine, ptToStr } from '../src/sim/engine.js';
 import { PREDEFINED_CIRCUITS } from '../src/sim/circuits.js';
@@ -10,41 +12,85 @@ const cases = [
   { key: 'diode_clipper', probe: { x: 360, y: 240 } },
   { key: 'freewheel', probe: { x: 360, y: 260 } },
 ];
-const steps = 2000;
-const dt = 1e-5;
-const point = (p) => ptToStr(p);
-function simulate(elements, mode, probe) {
-  const engine = compileCircuit(elements, dt, { diodeSolver: mode });
-  const voltages = [];
-  const begin = performance.now();
+const duration = 0.04;
+const referenceDt = 1e-6;
+const testDts = [1e-5, 5e-5, 1e-4];
+const guardedThreshold = 0.015; // V: ignore endpoint-state violations <= 15 mV
+const modes = ['predicted', 'guarded', 'hysteretic-corrected'];
+const repetitions = 3;
+
+function run(elements, mode, dt, probe) {
+  const eng = compileCircuit(elements, dt, {
+    diodeSolver: mode,
+    correctionGuard: guardedThreshold,
+  });
+  const voltage = [];
+  const steps = Math.round(duration / dt);
   let error = '';
-  for (let n = 0; n < steps; n++) {
+  const t0 = performance.now();
+  for (let k = 0; k < steps; k++) {
     try {
-      stepEngine(engine);
-      voltages.push(engine.currentNodes[point(probe)] ?? 0);
-    } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      stepEngine(eng);
+      voltage.push(eng.currentNodes[ptToStr(probe)] ?? 0);
+    } catch (err) {
+      error = String(err instanceof Error ? err.message : err);
       break;
     }
   }
-  return { voltages, ms: performance.now() - begin, stats: engine.diagnostics, error };
+  return { voltage, elapsedMs: performance.now() - t0, diagnostics: { ...eng.diagnostics }, error };
 }
-console.log('circuit,mode,completed_steps,wall_ms,linear_solves,matrix_rebuilds,state_disagreements,unresolved_steps,rmse_vs_iterative_v,error');
+
+function rmseAgainstReference(samples, ref, dt) {
+  const ratio = Math.round(dt / referenceDt);
+  if (samples.length === 0) return { rmse: NaN, maxError: NaN };
+  let sum = 0, maxError = 0;
+  for (let i = 0; i < samples.length; i++) {
+    // Same end-of-step sampling time.
+    const refIndex = (i + 1) * ratio - 1;
+    const delta = samples[i] - ref[refIndex];
+    sum += delta * delta;
+    maxError = Math.max(maxError, Math.abs(delta));
+  }
+  return { rmse: Math.sqrt(sum / samples.length), maxError };
+}
+
+const rows = [];
 for (const { key, probe } of cases) {
-  const scenario = PREDEFINED_CIRCUITS[key];
-  if (!scenario) throw new Error('Unknown reference circuit: ' + key);
-  const baseline = simulate(scenario.elements, 'iterative', probe);
-  const candidate = simulate(scenario.elements, 'predicted', probe);
-  const n = Math.min(baseline.voltages.length, candidate.voltages.length);
-  const rmse = n ? Math.sqrt(Array.from({ length: n }, (_, i) =>
-    (baseline.voltages[i] - candidate.voltages[i]) ** 2
-  ).reduce((a, b) => a + b, 0) / n) : NaN;
-  for (const [mode, result] of [['iterative', baseline], ['predicted', candidate]]) {
-    const s = result.stats;
-    const row = [key, mode, result.voltages.length, result.ms.toFixed(4),
-      s.linearSolves, s.matrixRebuilds, s.stateDisagreements, s.unresolvedSteps,
-      mode === 'predicted' ? rmse.toPrecision(8) : 0,
-      JSON.stringify(result.error)];
-    console.log(row.join(','));
+  const elements = PREDEFINED_CIRCUITS[key]?.elements;
+  if (!elements) throw new Error('Missing circuit ' + key);
+  const reference = run(elements, 'hysteretic-corrected', referenceDt, probe);
+  if (reference.error || reference.diagnostics.unresolvedSteps) {
+    // The reference is not a gold standard if states fail to settle.
+    // Keep documenting its failure, and do not report misleading RMSE.
+    throw new Error('Reference invalid for ' + key + ': ' + reference.error
+      + ', unresolved=' + reference.diagnostics.unresolvedSteps);
+  }
+  for (const dt of testDts) {
+    for (const mode of modes) {
+      const samples = [];
+      for (let repetition = 0; repetition < repetitions; repetition++) {
+        samples.push(run(elements, mode, dt, probe));
+      }
+      const result = samples[0];
+      const times = samples.map(s => s.elapsedMs).sort((a,b) => a-b);
+      const d = result.diagnostics;
+      const metrics = rmseAgainstReference(result.voltage, reference.voltage, dt);
+      rows.push({
+        circuit: key, dt_us: Math.round(dt * 1e6), mode,
+        steps: result.voltage.length,
+        median_elapsed_ms: times[Math.floor(times.length / 2)].toFixed(5),
+        linear_solves: d.linearSolves,
+        solves_per_step: (d.linearSolves / Math.max(result.voltage.length, 1)).toFixed(6),
+        matrix_rebuilds: d.matrixRebuilds,
+        state_disagreements: d.stateDisagreements,
+        state_corrections: d.stateCorrections,
+        unresolved_steps: d.unresolvedSteps,
+        rmse_v: metrics.rmse.toPrecision(8), max_abs_error_v: metrics.maxError.toPrecision(8),
+        error: JSON.stringify(result.error),
+      });
+    }
   }
 }
+const fields = Object.keys(rows[0]);
+console.log(fields.join(','));
+for (const row of rows) console.log(fields.map(key => row[key]).join(','));
