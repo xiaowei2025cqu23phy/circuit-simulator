@@ -9,7 +9,8 @@
  *  node scripts/benchmark-multi-topology.mjs > multi_topology.csv
  *  node scripts/benchmark-multi-topology.mjs --repetitions=3 --bank-counts=4,12 --ladder-stages=4,8
  *
- * Dense MNA; same PWL physics across backends. NOT a ngspice validation,
+ * Includes both light-load one-time and heavy-load repeated diode
+ * transitions. Dense MNA; same PWL physics across backends. NOT a ngspice validation,
  * continuous-time exact error bound, or React UI benchmark.
  */
 import { performance } from 'node:perf_hooks';
@@ -37,7 +38,10 @@ const cpus=os.cpus();
 const cpu=(cpus[0]?.model ?? 'unknown').replaceAll(',', ';');
 const scenarios=[
   ...bankCounts.map(n=>({name:'diode-bank-'+n,
-    topology:'parallel-diode-bank',scale:n,elements:makeParallelDiodeBank(n)})),
+    topology:'parallel-diode-bank-light',scale:n,elements:makeParallelDiodeBank(n)})),
+  ...bankCounts.map(n=>({name:'diode-bank-heavy-'+n,
+    topology:'parallel-diode-bank-heavy',scale:n,
+    elements:makeParallelDiodeBank(n,{loadProfile:'heavy'})})),
   ...['rc','rl','rlc'].flatMap(kind=>ladderStages.map(n=>({
     name:kind+'-ladder-'+n,topology:kind+'-ladder',scale:n,
     elements:makeReactiveLadder(n,{kind}),
