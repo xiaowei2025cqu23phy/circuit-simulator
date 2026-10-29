@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { factorizeLU, solveLU, matrixResidualInfinityNorm } from './linearSolve.js';
-import { compileCircuit, stepEngine, ptToStr } from './engine.js';
+import { compileCircuit, stepEngine, stepEngineAtScheduledEvents, ptToStr } from './engine.js';
 import { PREDEFINED_CIRCUITS } from './circuits.js';
 
 test('LU with partial pivoting handles required row exchange', () => {
@@ -66,4 +66,51 @@ test('unknown linear solver is rejected without changing defaults', () => {
     /线性求解/,
   );
   assert.equal(compileCircuit(PREDEFINED_CIRCUITS.rectifier.elements).linearSolver, 'inverse');
+});
+
+test('scheduled ON and OFF switch times are aligned without changing default stepping', () => {
+  const point = (x,y) => ({ x,y });
+  const elements = [
+    { id:'v', type:'voltage', p1:point(0,0), p2:point(0,40), value:5 },
+    { id:'sw', type:'switch', control:'time', timeOn:0.0015, timeOff:0.0035,
+      state:true, p1:point(0,0), p2:point(40,0) },
+    { id:'r', type:'resistor', p1:point(40,0), p2:point(40,40), value:1000 },
+    { id:'w', type:'wire', p1:point(40,40), p2:point(0,40) },
+    { id:'g', type:'ground', p1:point(0,40) },
+  ];
+  for (const linearSolver of ['inverse','lu']) {
+    const e = compileCircuit(elements, 0.001, { linearSolver });
+    assert.equal(stepEngineAtScheduledEvents(e), 0.001); // t = 1ms
+    assert.ok(Math.abs(stepEngineAtScheduledEvents(e) - 0.0005) < 1e-12); // t = 1.5ms
+    assert.ok(Math.abs(e.t - 0.0015) < 1e-12);
+    assert.equal(e.diagnostics.alignedTimeEvents, 1);
+    stepEngineAtScheduledEvents(e); // begins at ON event
+    assert.equal(e.switchStates.sw, true);
+    stepEngineAtScheduledEvents(e); // ends at 3.5ms, OFF event
+    assert.ok(Math.abs(e.t - 0.0035) < 1e-12);
+    stepEngineAtScheduledEvents(e); // begins at OFF event
+    assert.equal(e.switchStates.sw, false);
+    assert.equal(e.diagnostics.factorizations, e.diagnostics.matrixRebuilds + 1);
+    assert.ok(Number.isFinite(e.currentNodes[ptToStr(point(40,0))]));
+  }
+});
+
+test('known timed event is reached by an isolated short BE step in freewheel circuit', () => {
+  const e = compileCircuit(PREDEFINED_CIRCUITS.freewheel.elements, 0.004,
+    { diodeSolver: 'hysteretic-corrected', linearSolver: 'lu' });
+  for (let i=0; i<4; i++) stepEngineAtScheduledEvents(e);
+  assert.ok(Math.abs(e.t - 0.015) < 1e-12);
+  assert.equal(e.diagnostics.alignedTimeEvents, 1);
+  stepEngineAtScheduledEvents(e);
+  assert.equal(e.switchStates.sw1, false);
+  assert.ok(Number.isFinite(e.currentNodes[ptToStr({ x:360,y:260 })]));
+});
+
+test('scheduled-event wrapper is not a diode threshold event locator', () => {
+  const e = compileCircuit(PREDEFINED_CIRCUITS.diode_clipper.elements, 1e-5,
+    { diodeSolver:'predicted',linearSolver:'lu' });
+  for (let k = 0; k < 50; k++) {
+    assert.equal(stepEngineAtScheduledEvents(e), 1e-5);
+  }
+  assert.equal(e.diagnostics.alignedTimeEvents, 0);
 });
