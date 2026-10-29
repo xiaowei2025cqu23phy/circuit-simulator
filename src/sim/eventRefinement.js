@@ -23,6 +23,9 @@ export function snapshotEngine(e) {
     needsMatrixRebuild: e.needsMatrixRebuild,
     A_inv: e.A_inv,
     luFactors: e.luFactors,
+    factorStates: { ...e.factorStates },
+    factorDt: e.factorDt,
+    rankOneSinceFull: e.rankOneSinceFull,
     history: e.history,
     historyLength: e.history.length,
     longHistory,
@@ -42,6 +45,9 @@ export function restoreEngine(e, s) {
   e.needsMatrixRebuild = s.needsMatrixRebuild;
   e.A_inv = s.A_inv;
   e.luFactors = s.luFactors;
+  e.factorStates = s.factorStates;
+  e.factorDt = s.factorDt;
+  e.rankOneSinceFull = s.rankOneSinceFull;
   e.history = s.longHistory ?? s.history;
   if (!s.longHistory) e.history.length = s.historyLength;
   e.lastMeasured = s.lastMeasured;
