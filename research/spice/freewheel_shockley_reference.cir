@@ -1,0 +1,18 @@
+* Independent SPICE physical-diode / controlled-switch reference
+* Freewheel: 5V, 0.1H inductor, switch opens near 15 ms.
+* NOT identical-PWL: Shockley diode, voltage-controlled switch.
+VIN in 0 DC 5
+VCTRL ctrl 0 PULSE(5 0 15m 1n 1n 20m 50m)
+SW1 in out ctrl 0 SWMODEL
+L1 out 0 0.1
+D1 0 out DPHYS
+.model SWMODEL SW(RON=0.01 ROFF=1e8 VT=2.5 VH=0.1)
+.model DPHYS D(IS=1e-12 N=1.8 RS=0.05 CJO=0 TT=0)
+.tran 1u 40m 0 1u
+.control
+set filetype=ascii
+tran 1u 40m 0 1u
+wrdata freewheel_shockley_out.txt v(out)
+quit
+.endc
+.end
