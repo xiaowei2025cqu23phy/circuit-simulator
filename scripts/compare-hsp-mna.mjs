@@ -16,13 +16,15 @@ const duration = 0.04;
 const referenceDt = 1e-6;
 const testDts = [1e-5, 5e-5, 1e-4];
 const guardedThreshold = 0.015; // V: ignore endpoint-state violations <= 15 mV
-const modes = ['predicted', 'guarded', 'hysteretic-corrected'];
+const modes = ['predicted', 'guarded', 'adaptive', 'hysteretic-corrected'];
+const adaptiveScale = 0.2; // V; sensitivity scale for adaptive candidate
 const repetitions = 3;
 
 function run(elements, mode, dt, probe) {
   const eng = compileCircuit(elements, dt, {
     diodeSolver: mode,
     correctionGuard: guardedThreshold,
+    adaptiveScale,
   });
   const voltage = [];
   const steps = Math.round(duration / dt);
@@ -84,6 +86,7 @@ for (const { key, probe } of cases) {
         matrix_rebuilds: d.matrixRebuilds,
         state_disagreements: d.stateDisagreements,
         state_corrections: d.stateCorrections,
+        adaptive_tightened_steps: d.adaptiveTightenedSteps,
         unresolved_steps: d.unresolvedSteps,
         rmse_v: metrics.rmse.toPrecision(8), max_abs_error_v: metrics.maxError.toPrecision(8),
         error: JSON.stringify(result.error),
