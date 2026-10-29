@@ -1,0 +1,15 @@
+* Independent SPICE physical-diode reference (NOT identical PWL model)
+* Half-wave rectifier: 12 V peak, 50 Hz, C=470uF, RL=100 ohm
+VIN 0 in SIN(0 12 50)
+D1 in out DPHYS
+C1 out 0 470u
+RLOAD out 0 100
+.model DPHYS D(IS=1e-12 N=1.8 RS=0.05 CJO=0 TT=0)
+.tran 1u 40m 0 1u
+.control
+set filetype=ascii
+tran 1u 40m 0 1u
+wrdata rectifier_shockley_out.txt v(out)
+quit
+.endc
+.end
