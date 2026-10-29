@@ -1,7 +1,7 @@
 # HSP-MNA experimental solver mode
 
 The existing default diode solver remains the baseline: `compileCircuit(elements, dt)`.
-The optional predictor is selected by `compileCircuit(elements, dt, { diodeSolver: 'predicted' })`.
+The optional predictor is selected by `compileCircuit(elements, dt, { diodeSolver: 'predicted' })`. Same-model alternatives: `diodeSolver: 'guarded'` (set `correctionGuard: 0.015` in volts) and `diodeSolver: 'hysteretic-corrected'`. Both share the exact 0.70/0.65 V hysteresis law with the predictor, unlike the legacy default's reverse-current release rule.
 
 Both solvers use the same two-state PWL diode equivalent circuit. The predicted mode uses the **previous accepted** node solution with hysteresis thresholds 0.70 V (turn-on) and 0.65 V (turn-off), and performs one linear solve per time step. It does not enforce a current-step diode complementarity condition. Therefore it is an **approximate experimental method**, not a drop-in precision replacement.
 
@@ -36,3 +36,7 @@ The independent script compares historical prediction and endpoint state correct
 - The default solver uses a 0.7 V turn-on threshold and a negative-conduction-current release test, while the experimental predictor uses a 0.70/0.65 V hysteretic voltage state machine. Therefore their differences reflect **both** state-selection policies and threshold policy; a strict apples-to-apples study should first standardize the switching law and handle the non-convergence near threshold.
 - Both modes currently reuse an explicit Gauss–Jordan inverse, not LU factorization; LU is a proposed improvement rather than a deployed fact.
 - The repository presently implements no BJT or NMOS device models. Planned device stamps in the paper must not be described as tested features.
+
+### Three-mode engine comparison
+
+See [`three-mode-benchmark.md`](three-mode-benchmark.md) for 4 predefined circuits × 3 step sizes × 3 strategies, reference conditions, CSV provenance, and the freewheel counterexample (single-step predicted -7.5 kV node excursion). All engine results were evaluated in an isolated V8 JavaScript environment; npm/CI, Node timing and external SPICE validation are pending. The `guarded` solver is not universally better than either extreme. Do not assert general speed superiority on the basis of linear-solve counts alone.
