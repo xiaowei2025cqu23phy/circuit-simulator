@@ -381,13 +381,13 @@ export function compileCircuit(els, dt = DEFAULT_DT, options = {}) {
   const engineEls = els.map(e => ({ ...e }));
 
   return {
-    dt, t: 0, size, N, M, A_inv, luFactors, linearSolver, validEls, branchEls, branchMap, dsu, nodeMap, finalGroundRoot,
+    dt, nominalDt: dt, eventAwareTime: false, t: 0, size, N, M, A_inv, luFactors, linearSolver, validEls, branchEls, branchMap, dsu, nodeMap, finalGroundRoot,
     state: {}, history: [], currentNodes: {}, allEls: engineEls, switchStates,
     needsMatrixRebuild: false, lastMeasured: null, lastUiTime: 0,
     diodeSolver, correctionGuard, adaptiveScale, previousSolution: null,
     diagnostics: { steps: 0, linearSolves: 0, matrixRebuilds: 0, stateDisagreements: 0, unresolvedSteps: 0,
       stateCorrections: 0, stepsWithCorrections: 0, adaptiveTightenedSteps: 0,
-      factorizations: 1 },
+      factorizations: 1, alignedTimeEvents: 0 },
   };
 }
 
@@ -398,7 +398,9 @@ export function stepEngine(eng, probeId = null) {
   // 1) 更新定时开关状态（与电压无关，提前生效避免一步延迟）
   validEls.forEach(el => {
     if (el.type === 'switch' && el.control === 'time') {
-      const shouldBeON = (eng.t >= (el.timeOn || 0) && eng.t <= (el.timeOff || 0));
+      const shouldBeON = eng.eventAwareTime
+        ? (eng.t >= (el.timeOn || 0) && eng.t < (el.timeOff || 0))
+        : (eng.t >= (el.timeOn || 0) && eng.t <= (el.timeOff || 0));
       if (switchStates[el.id] !== shouldBeON) { switchStates[el.id] = shouldBeON; eng.needsMatrixRebuild = true; }
     }
   });
@@ -590,4 +592,45 @@ export function stepEngine(eng, probeId = null) {
     eng.lastMeasured = null;
   }
   eng.t += dt;
+}
+
+
+/**
+ * Time-align known scheduled switch boundaries by making an *isolated* short
+ * Backward-Euler step ending at a known timeOn/timeOff breakpoint.
+ *
+ * This is NOT a diode voltage-root solver. It does not find unknown switching
+ * times, eliminate model error, or recover global second-order accuracy.
+ * The underlying stepEngine time-source convention is retained for baseline
+ * compatibility; only the step LENGTH and timed-switch boundary ownership
+ * are changed when this wrapper is explicitly requested.
+ *
+ * The following nominal step starts at the breakpoint. Its matrix is
+ * refactorized whenever the companion model coefficient dt changes.
+ */
+export function stepEngineAtScheduledEvents(eng, probeId = null) {
+  const baseDt = eng.nominalDt ?? eng.dt;
+  if (!Number.isFinite(baseDt) || baseDt <= 0) throw new Error('额定仿真步长无效');
+  const now = eng.t;
+  let stepDt = baseDt;
+  const tol = 1e-11 * Math.max(baseDt, 1e-9);
+  for (const el of eng.validEls) {
+    if (el.type !== 'switch' || el.control !== 'time') continue;
+    for (const key of ['timeOn', 'timeOff']) {
+      const eventTime = Number(el[key]);
+      if (Number.isFinite(eventTime) && eventTime > now + tol && eventTime < now + stepDt - tol) {
+        stepDt = eventTime - now;
+      }
+    }
+  }
+  // Save the step-size choice before the solver; another state change might
+  // also request a rebuild, so use OR rather than resetting the flag.
+  if (Math.abs(eng.dt - stepDt) > tol) {
+    eng.dt = stepDt;
+    eng.needsMatrixRebuild = true;
+  }
+  eng.eventAwareTime = true;
+  stepEngine(eng, probeId);
+  if (stepDt < baseDt - tol) eng.diagnostics.alignedTimeEvents += 1;
+  return stepDt;
 }
