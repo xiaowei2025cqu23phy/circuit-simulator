@@ -39,3 +39,26 @@ export function countDiodeStateDisagreements(validEls, switchStates, solution, {
   }
   return count;
 }
+
+
+/** Inspect solved endpoint values under the SAME hysteretic state law.
+ * Returns only state transitions exceeding the supplied voltage tolerance.
+ * For the guarded mode, smaller residual violations are deliberately delayed.
+ */
+export function endpointDiodeUpdates(validEls, switchStates, solution, guard = 0, {
+  turnOn = DIODE_ON_VOLTAGE,
+  turnOff = DIODE_OFF_VOLTAGE,
+} = {}) {
+  if (!(guard >= 0 && Number.isFinite(guard))) throw new Error('状态校正容差必须为非负有限数');
+  if (!(turnOff < turnOn)) throw new Error('二极管迟滞阈值必须满足 turnOff < turnOn');
+  const updates = [];
+  for (const el of validEls) {
+    if (el.type !== 'diode') continue;
+    const vD = (el.n1 >= 0 ? solution[el.n1] : 0)
+      - (el.n2 >= 0 ? solution[el.n2] : 0);
+    const on = Boolean(switchStates[el.id]);
+    const violation = on ? turnOff - vD : vD - turnOn;
+    if (violation > guard) updates.push({ id: el.id, nextOn: !on, violation });
+  }
+  return updates;
+}
