@@ -1,7 +1,7 @@
-// Reproducible comparison of three methods under ONE hysteretic PWL law.
+// Reproducible comparison of four methods under ONE hysteretic PWL law.
 // `node scripts/compare-hsp-mna.mjs > results.csv`
 // No SPICE validation is implied; the fine-grid reference uses the same PWL
-// device model and endpoint-corrected algorithm, only a smaller time step.
+// device model, BE endpoint-sampled forcing, and corrected algorithm at smaller dt.
 import { performance } from 'node:perf_hooks';
 import { compileCircuit, stepEngine, ptToStr } from '../src/sim/engine.js';
 import { PREDEFINED_CIRCUITS } from '../src/sim/circuits.js';
@@ -25,6 +25,8 @@ function run(elements, mode, dt, probe) {
     diodeSolver: mode,
     correctionGuard: guardedThreshold,
     adaptiveScale,
+    sourceSampling: 'be-end',
+    linearSolver: 'lu',
   });
   const voltage = [];
   const steps = Math.round(duration / dt);
@@ -79,6 +81,7 @@ for (const { key, probe } of cases) {
       const metrics = rmseAgainstReference(result.voltage, reference.voltage, dt);
       rows.push({
         circuit: key, dt_us: Math.round(dt * 1e6), mode,
+        source_sampling: 'be-end', linear_solver: 'lu',
         steps: result.voltage.length,
         median_elapsed_ms: times[Math.floor(times.length / 2)].toFixed(5),
         linear_solves: d.linearSolves,
