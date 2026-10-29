@@ -52,3 +52,38 @@ test('闭合开关的测量电流使用与矩阵一致的 0.01Ω 电阻', () => 
   stepEngine(eng, 'sw');
   assert.ok(Math.abs(eng.lastMeasured.i - 5 / 1000.01) < 1e-8);
 });
+
+test('三种研究模式使用同一迟滞判据；零容差等价于端点校正', () => {
+  const corrected = compileCircuit(diodeCircuit(), 1e-5, { diodeSolver: 'hysteretic-corrected' });
+  const zeroGuard = compileCircuit(diodeCircuit(), 1e-5, { diodeSolver: 'guarded', correctionGuard: 0 });
+  const predicted = compileCircuit(diodeCircuit(), 1e-5, { diodeSolver: 'predicted' });
+  const wideGuard = compileCircuit(diodeCircuit(), 1e-5, { diodeSolver: 'guarded', correctionGuard: 1e6 });
+  for (let k = 0; k < 40; k++) {
+    for (const eng of [corrected, zeroGuard, predicted, wideGuard]) stepEngine(eng, 'load');
+    assert.equal(corrected.lastMeasured.v, zeroGuard.lastMeasured.v);
+    assert.deepEqual(corrected.switchStates, zeroGuard.switchStates);
+    assert.equal(predicted.lastMeasured.v, wideGuard.lastMeasured.v);
+    assert.deepEqual(predicted.switchStates, wideGuard.switchStates);
+  }
+  assert.equal(corrected.diagnostics.linearSolves, zeroGuard.diagnostics.linearSolves);
+  assert.equal(predicted.diagnostics.linearSolves, 40);
+  assert.equal(wideGuard.diagnostics.linearSolves, 40);
+});
+
+test('端点校正能报告状态修正；单次预测暴露一步延迟', () => {
+  const predicted = compileCircuit(diodeCircuit(), 1e-5, { diodeSolver: 'predicted' });
+  const corrected = compileCircuit(diodeCircuit(), 1e-5, { diodeSolver: 'hysteretic-corrected' });
+  stepEngine(predicted, 'load');
+  stepEngine(corrected, 'load');
+  assert.equal(predicted.switchStates.d, false, '尚无上一时刻电压，第一步仍使用截止区');
+  assert.equal(corrected.switchStates.d, true, '端点校正应在同一步打开二极管');
+  assert.equal(predicted.diagnostics.stateDisagreements, 1);
+  assert.ok(corrected.diagnostics.stateCorrections >= 1);
+  assert.equal(corrected.diagnostics.stepsWithCorrections, 1);
+  assert.equal(corrected.diagnostics.stateDisagreements, 0);
+});
+
+test('对非法研究参数给出明确错误', () => {
+  assert.throws(() => compileCircuit(diodeCircuit(), 1e-5, { diodeSolver: 'unknown' }), /未知/);
+  assert.throws(() => compileCircuit(diodeCircuit(), 1e-5, { diodeSolver: 'guarded', correctionGuard: -0.1 }), /容差/);
+});
