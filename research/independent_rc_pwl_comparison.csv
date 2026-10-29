@@ -1,0 +1,11 @@
+h_us,method,steps,rmse_mV,max_error_mV,linear_solves,mean_solves_per_step,state_flips,predicted_inconsistencies,unresolved_steps
+10,predicted,4000,1.20659,3.23393,4000,1.0,16,16,0
+10,endpoint_correction,4000,1.15229,2.70972,4016,1.004,16,0,0
+20,predicted,2000,2.34462,5.61014,2000,1.0,16,16,0
+20,endpoint_correction,2000,2.28401,5.37595,2016,1.008,16,0,0
+50,predicted,800,6.22584,14.39315,800,1.0,16,16,0
+50,endpoint_correction,800,5.64979,13.61636,816,1.02,16,0,0
+100,predicted,400,13.33009,29.30525,400,1.0,16,16,0
+100,endpoint_correction,400,11.12965,27.12426,416,1.04,16,0,0
+200,predicted,200,30.13172,60.17373,200,1.0,16,16,0
+200,endpoint_correction,200,21.51731,53.36583,216,1.08,16,0,0

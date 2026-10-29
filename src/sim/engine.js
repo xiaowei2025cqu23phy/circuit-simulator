@@ -12,9 +12,12 @@
 //  - 开关:    闭合 0.01Ω / 断开 1e8Ω
 // ============================================================
 
-export const GMIN = 1e-12;          // 对角最小电导 (保证矩阵非奇异)
+export const GMIN = 1e-12;          // 对地弱电导（不保证任意 MNA 系统可逆）
 export const DEFAULT_DT = 1e-5;     // 默认仿真步长 10µs
 export const HISTORY_MAX = 250000;  // 波形历史最大点数
+import { predictDiodeStates, countDiodeStateDisagreements, endpointDiodeUpdates, adaptiveDiodeGuard } from './statePrediction.js';
+import { factorizeLU, solveLU } from './linearSolve.js';
+import { updateInverseForConductanceBranch } from './rankOneUpdate.js';
 
 // ---------- 并查集：导线/标签/接地节点合并 ----------
 export class DSU {
@@ -239,7 +242,23 @@ function segIntersect(a1, a2, b1, b2) {
   return { x: a1.x + t * d1x, y: a1.y + t * d1y };
 }
 
-export function compileCircuit(els, dt = DEFAULT_DT) {
+export function compileCircuit(els, dt = DEFAULT_DT, options = {}) {
+  const diodeSolver = options.diodeSolver ?? 'iterative';
+  const linearSolver = options.linearSolver ?? 'inverse';
+  const sourceSampling = options.sourceSampling ?? 'legacy-start';
+  if (!['legacy-start', 'be-end'].includes(sourceSampling)) throw new Error('未知源信号采样约定');
+  if (!['inverse', 'lu', 'inverse-rank1'].includes(linearSolver)) throw new Error('未知线性求解模式');
+  const maxRankOneUpdates = options.maxRankOneUpdates ?? 32;
+  const rankOneDenominatorFloor = options.rankOneDenominatorFloor ?? 1e-6;
+  if (!Number.isFinite(rankOneDenominatorFloor) || rankOneDenominatorFloor <= 0 || rankOneDenominatorFloor > 0.1)
+    throw new Error('秩一分母相对下界无效');
+  if (!Number.isInteger(maxRankOneUpdates) || maxRankOneUpdates < 1 || maxRankOneUpdates > 512)
+    throw new Error('秩一更新次数上限应为 1 到 512 之间的整数');
+  if (!['iterative', 'predicted', 'guarded', 'hysteretic-corrected', 'adaptive'].includes(diodeSolver)) throw new Error('未知二极管求解模式');
+  const correctionGuard = options.correctionGuard ?? 0.015;
+  if (!Number.isFinite(correctionGuard) || correctionGuard < 0) throw new Error('校正容差必须为非负有限数');
+  const adaptiveScale = options.adaptiveScale ?? 0.2;
+  if (!Number.isFinite(adaptiveScale) || adaptiveScale <= 0) throw new Error('自适应电压尺度必须大于零');
   const dsu = new DSU();
   let hasGround = false;
   const labelsByText = {};
@@ -362,28 +381,40 @@ export function compileCircuit(els, dt = DEFAULT_DT) {
   });
 
   const A = buildMNA(N, M, dt, validEls, branchEls, switchStates);
-  const A_inv = invertMatrix(A);
-  if (!A_inv) throw new Error('电路拓扑存在悬空节点或非法连接（无法求解），请检查电路是否完整。');
+  const A_inv = linearSolver !== 'lu' ? invertMatrix(A) : null;
+  const luFactors = linearSolver === 'lu' ? factorizeLU(A) : null;
+  if (!(A_inv || luFactors)) throw new Error('电路拓扑存在悬空节点或非法连接（无法求解），请检查电路是否完整。');
 
   const branchMap = {};
   branchEls.forEach((el, idx) => { branchMap[el.id] = N + idx; });
   const engineEls = els.map(e => ({ ...e }));
 
   return {
-    dt, t: 0, size, N, M, A_inv, validEls, branchEls, branchMap, dsu, nodeMap, finalGroundRoot,
+    dt, nominalDt: dt, eventAwareTime: false, sourceSampling, t: 0, size, N, M, A_inv, luFactors, linearSolver, validEls, branchEls, branchMap, dsu, nodeMap, finalGroundRoot,
+    factorStates: { ...switchStates }, factorDt: dt, rankOneSinceFull: 0,
+    maxRankOneUpdates, rankOneDenominatorFloor,
     state: {}, history: [], currentNodes: {}, allEls: engineEls, switchStates,
     needsMatrixRebuild: false, lastMeasured: null, lastUiTime: 0,
+    diodeSolver, correctionGuard, adaptiveScale, previousSolution: null,
+    diagnostics: { steps: 0, linearSolves: 0, matrixRebuilds: 0, stateDisagreements: 0, unresolvedSteps: 0,
+      stateCorrections: 0, stepsWithCorrections: 0, adaptiveTightenedSteps: 0,
+      factorizations: 1, alignedTimeEvents: 0, rankOneUpdates: 0, rankOneFallbacks: 0 },
   };
 }
 
 // ---------- 单步瞬态求解 ----------
 export function stepEngine(eng, probeId = null) {
   const { dt, size, validEls, branchMap, state, switchStates } = eng;
+  // Standard backward Euler samples prescribed sources at the NEW endpoint.
+  // Preserve the legacy UI's start-of-step behavior unless explicitly enabled.
+  const sampleTime = eng.sourceSampling === 'be-end' ? eng.t + dt : eng.t;
 
   // 1) 更新定时开关状态（与电压无关，提前生效避免一步延迟）
   validEls.forEach(el => {
     if (el.type === 'switch' && el.control === 'time') {
-      const shouldBeON = (eng.t >= (el.timeOn || 0) && eng.t <= (el.timeOff || 0));
+      const shouldBeON = (eng.eventAwareTime || eng.sourceSampling === 'be-end')
+        ? (sampleTime >= (el.timeOn || 0) && sampleTime < (el.timeOff || 0))
+        : (sampleTime >= (el.timeOn || 0) && sampleTime <= (el.timeOff || 0));
       if (switchStates[el.id] !== shouldBeON) { switchStates[el.id] = shouldBeON; eng.needsMatrixRebuild = true; }
     }
   });
@@ -393,9 +424,47 @@ export function stepEngine(eng, probeId = null) {
   //    使二极管通断在本步内收敛，避免"一步延迟"造成的伪尖峰。
   const assembleAndSolve = () => {
     if (eng.needsMatrixRebuild) {
-      const A_new = buildMNA(eng.N, eng.M, dt, validEls, eng.branchEls, switchStates);
-      const inv = invertMatrix(A_new);
-      if (inv) eng.A_inv = inv;
+      let reused = false;
+      if (eng.linearSolver === 'inverse-rank1' && eng.factorDt === dt) {
+        const changed = validEls.filter(el => el.type === 'diode' || el.type === 'switch')
+          .filter(el => Boolean(eng.factorStates[el.id]) !== Boolean(switchStates[el.id]));
+        const onlyDiodes = changed.length > 0 && changed.every(el => el.type === 'diode');
+        if (onlyDiodes && eng.rankOneSinceFull + changed.length <= eng.maxRankOneUpdates) {
+          let nextInverse = eng.A_inv;
+          for (const el of changed) {
+            const nextG = switchStates[el.id] ? 20 : 1e-8;
+            const oldG = eng.factorStates[el.id] ? 20 : 1e-8;
+            nextInverse = updateInverseForConductanceBranch(nextInverse, el.n1, el.n2, nextG - oldG,
+              { relativeDenominatorFloor: eng.rankOneDenominatorFloor });
+            if (!nextInverse) break;
+          }
+          if (nextInverse) {
+            eng.A_inv = nextInverse;
+            eng.rankOneSinceFull += changed.length;
+            eng.diagnostics.rankOneUpdates += changed.length;
+            reused = true;
+          } else {
+            eng.diagnostics.rankOneFallbacks += 1;
+          }
+        }
+      }
+      if (!reused) {
+        const A_new = buildMNA(eng.N, eng.M, dt, validEls, eng.branchEls, switchStates);
+        if (eng.linearSolver === 'lu') {
+          const factors = factorizeLU(A_new);
+          if (!factors) throw new Error('状态切换后 MNA 矩阵无法 LU 分解');
+          eng.luFactors = factors;
+        } else {
+          const inv = invertMatrix(A_new);
+          if (!inv) throw new Error('状态切换后 MNA 矩阵不可逆，已停止仿真');
+          eng.A_inv = inv;
+        }
+        eng.diagnostics.factorizations += 1;
+        eng.rankOneSinceFull = 0;
+      }
+      eng.factorStates = { ...switchStates };
+      eng.factorDt = dt;
+      eng.diagnostics.matrixRebuilds += 1;
       eng.needsMatrixRebuild = false;
     }
     const b = Array(size).fill(0);
@@ -407,9 +476,9 @@ export function stepEngine(eng, probeId = null) {
         if (n2 >= 0) b[n2] -= Ieq;
       }
       else if (type === 'inductor') b[branchMap[id]] = -((Number(value) || 1e-3) / dt) * (state[id] || 0);
-      else if (type === 'voltage') b[branchMap[id]] = getSourceValue(el, eng.t);
+      else if (type === 'voltage') b[branchMap[id]] = getSourceValue(el, sampleTime);
       else if (type === 'current') {
-        const isrc = getSourceValue(el, eng.t);
+        const isrc = getSourceValue(el, sampleTime);
         if (n1 >= 0) b[n1] -= isrc;
         if (n2 >= 0) b[n2] += isrc;
       }
@@ -419,36 +488,98 @@ export function stepEngine(eng, probeId = null) {
         if (n2 >= 0) b[n2] -= ieq;
       }
     });
-    // 求解 x = A_inv · b
-    const x = Array(size).fill(0);
-    for (let i = 0; i < size; i++) {
-      let sum = 0;
-      for (let j = 0; j < size; j++) sum += eng.A_inv[i][j] * b[j];
-      x[i] = sum;
+    // Reuse whichever matrix factorization belongs to the current PWL state.
+    let x;
+    if (eng.linearSolver === 'lu') {
+      x = solveLU(eng.luFactors, b);
+    } else {
+      x = Array(size).fill(0);
+      for (let i = 0; i < size; i++) {
+        let sum = 0;
+        for (let j = 0; j < size; j++) sum += eng.A_inv[i][j] * b[j];
+        x[i] = sum;
+      }
     }
+    eng.diagnostics.linearSolves += 1;
     return x;
   };
 
   let x = null;
-  for (let iter = 0; iter < 12; iter++) {
-    x = assembleAndSolve();
-    let changed = false;
-    validEls.forEach(el => {
-      if (el.type !== 'diode') return;
-      const vD = (el.n1 >= 0 ? x[el.n1] : 0) - (el.n2 >= 0 ? x[el.n2] : 0);
-      const wasON = switchStates[el.id];
-      if (!wasON) {
-        if (vD > 0.7) { switchStates[el.id] = true; changed = true; }
-      } else {
-        // 导通压降模型下 vD = 0.7 + i·Ron 恒 ≥ 0.7，
-        // 故必须用电流判据释放：模型电流为负（被电路反向驱动）→ 关断阻断
-        const iD = (vD - 0.7) / 0.05;
-        if (iD < -1e-6) { switchStates[el.id] = false; changed = true; }
+  if (eng.diodeSolver !== 'iterative') {
+    // Four experimental research methods use the same hysteretic 0.70/0.65 V state law.
+    const predictedChanges = predictDiodeStates(validEls, switchStates, eng.previousSolution);
+    if (predictedChanges) eng.needsMatrixRebuild = true;
+
+    // A single solve is sufficient for the deliberately approximate predictor.
+    // Guarded and endpoint-corrected modes may perform extra solves when the
+    // *current* endpoint violates the same hysteresis transition law.
+    let settled = false;
+    let correctedThisStep = false;
+    let tightenedThisStep = false;
+    let statesUsedForLastSolve = null;
+    for (let iter = 0; iter < 12; iter++) {
+      statesUsedForLastSolve = { ...switchStates };
+      x = assembleAndSolve();
+      if (eng.diodeSolver === 'predicted') { settled = true; break; }
+
+      let guard = eng.diodeSolver === 'guarded' ? eng.correctionGuard : 0;
+      if (eng.diodeSolver === 'adaptive') {
+        guard = adaptiveDiodeGuard(validEls, eng.previousSolution, x, {
+          maxGuard: eng.correctionGuard,
+          scale: eng.adaptiveScale,
+        });
+        if (guard < eng.correctionGuard / 2) tightenedThisStep = true;
       }
-    });
-    if (changed) { eng.needsMatrixRebuild = true; continue; }
-    break;
+      const updates = endpointDiodeUpdates(validEls, switchStates, x, guard);
+      if (updates.length === 0) { settled = true; break; }
+      for (const update of updates) switchStates[update.id] = update.nextOn;
+      eng.diagnostics.stateCorrections += updates.length;
+      correctedThisStep = true;
+      eng.needsMatrixRebuild = true;
+    }
+    if (!settled) {
+      // Some switched networks do not have a consistent finite-state endpoint.
+      // Preserve the state used for the last SOLVED matrix and warn, rather
+      // than returning mismatched voltages and device states.
+      eng.diagnostics.unresolvedSteps += 1;
+      Object.assign(switchStates, statesUsedForLastSolve);
+      eng.needsMatrixRebuild = false;
+    }
+    if (correctedThisStep) eng.diagnostics.stepsWithCorrections += 1;
+    if (tightenedThisStep) eng.diagnostics.adaptiveTightenedSteps += 1;
+    eng.diagnostics.stateDisagreements += countDiodeStateDisagreements(validEls, switchStates, x);
+  } else {
+    // Legacy baseline: retains reverse-current release criterion and is NOT
+    // the same state law as the three experimental research modes.
+    let converged = false;
+    let statesUsedForLastSolve = null;
+    for (let iter = 0; iter < 12; iter++) {
+      statesUsedForLastSolve = { ...switchStates };
+      x = assembleAndSolve();
+      let changed = false;
+      validEls.forEach(el => {
+        if (el.type !== 'diode') return;
+        const vD = (el.n1 >= 0 ? x[el.n1] : 0) - (el.n2 >= 0 ? x[el.n2] : 0);
+        const wasON = switchStates[el.id];
+        if (!wasON) {
+          if (vD > 0.7) { switchStates[el.id] = true; changed = true; }
+        } else {
+          const iD = (vD - 0.7) / 0.05;
+          if (iD < -1e-6) { switchStates[el.id] = false; changed = true; }
+        }
+      });
+      if (changed) { eng.needsMatrixRebuild = true; continue; }
+      converged = true;
+      break;
+    }
+    if (!converged) {
+      eng.diagnostics.unresolvedSteps += 1;
+      Object.assign(switchStates, statesUsedForLastSolve);
+      eng.needsMatrixRebuild = false;
+    }
   }
+  eng.previousSolution = x.slice();
+  eng.diagnostics.steps += 1;
 
   // 3) 测量与状态更新
   let measuredV = 0, measuredI = 0;
@@ -461,9 +592,9 @@ export function stepEngine(eng, probeId = null) {
     else if (type === 'inductor') { i_elem = x[branchMap[id]]; state[id] = i_elem; }
     else if (type === 'voltage') i_elem = x[branchMap[id]];
     else if (type === 'resistor') i_elem = v_elem / (Number(value) || 1e-3);
-    else if (type === 'current') i_elem = getSourceValue(el, eng.t);
+    else if (type === 'current') i_elem = getSourceValue(el, sampleTime);
     else if (type === 'diode' || type === 'switch') {
-      const g = switchStates[id] ? 1.0 / 0.05 : 1e-8;
+      const g = switchStates[id] ? 1.0 / (type === 'switch' ? 0.01 : 0.05) : 1e-8;
       i_elem = v_elem * g;
       if (type === 'diode' && switchStates[id]) i_elem -= 0.7 * g;
     }
@@ -496,12 +627,59 @@ export function stepEngine(eng, probeId = null) {
 
   // 6) 波形历史（按点数上限截断，块式清理避免频繁大数组操作）
   if (probeId) {
-    eng.history.push({ t: eng.t, v: measuredV, i: measuredI });
-    eng.lastMeasured = { t: eng.t, v: measuredV, i: measuredI };
+    eng.history.push({ t: sampleTime, v: measuredV, i: measuredI });
+    eng.lastMeasured = { t: sampleTime, v: measuredV, i: measuredI };
     if (eng.history.length >= HISTORY_MAX + 1000) eng.history.splice(0, eng.history.length - HISTORY_MAX);
   } else if (eng.history.length) {
     eng.history = [];
     eng.lastMeasured = null;
   }
   eng.t += dt;
+}
+
+
+/**
+ * Time-align known scheduled switch boundaries by making an *isolated* short
+ * Backward-Euler step ending at a known timeOn/timeOff breakpoint.
+ *
+ * This is NOT a diode voltage-root solver. It does not find unknown switching
+ * times, eliminate model error, or recover global second-order accuracy.
+ * The underlying stepEngine time-source convention is retained for baseline
+ * compatibility; only the step LENGTH and timed-switch boundary ownership
+ * are changed when this wrapper is explicitly requested.
+ *
+ * The following nominal step starts at the breakpoint. Its matrix is
+ * refactorized whenever the companion model coefficient dt changes.
+ */
+export function stepEngineAtScheduledEvents(eng, probeId = null) {
+  const baseDt = eng.nominalDt ?? eng.dt;
+  if (!Number.isFinite(baseDt) || baseDt <= 0) throw new Error('额定仿真步长无效');
+  const now = eng.t;
+  let stepDt = baseDt;
+  const tol = 1e-11 * Math.max(baseDt, 1e-9);
+  for (const el of eng.validEls) {
+    if (el.type !== 'switch' || el.control !== 'time') continue;
+    for (const key of ['timeOn', 'timeOff']) {
+      const eventTime = Number(el[key]);
+      if (Number.isFinite(eventTime) && eventTime > now + tol && eventTime < now + stepDt - tol) {
+        stepDt = eventTime - now;
+      }
+    }
+  }
+  // Save the step-size choice before the solver; another state change might
+  // also request a rebuild, so use OR rather than resetting the flag.
+  if (Math.abs(eng.dt - stepDt) > tol) {
+    eng.dt = stepDt;
+    eng.needsMatrixRebuild = true;
+  }
+  const previousBoundarySemantics = eng.eventAwareTime;
+  eng.eventAwareTime = true;
+  try {
+    stepEngine(eng, probeId);
+  } finally {
+    // The wrapper must not silently alter later calls to the ordinary API.
+    eng.eventAwareTime = previousBoundarySemantics;
+  }
+  if (stepDt < baseDt - tol) eng.diagnostics.alignedTimeEvents += 1;
+  return stepDt;
 }

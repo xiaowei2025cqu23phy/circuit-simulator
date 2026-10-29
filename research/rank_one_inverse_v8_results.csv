@@ -1,0 +1,44 @@
+# Actual GitHub JavaScript source, isolated V8; NOT a wall-clock benchmark.
+# 4 circuits x 5 hysteresis/legacy policies x 2 inverse strategies; 4000 time steps; BE-end; dt 10us.
+# Numerical parity and inverse counts only; machine timing to be measured using Node benchmark.
+circuit,mode,linear_solver,steps,linear_solves,complete_inversions,rank_one_updates,rank_one_fallbacks,matrix_state_changes,max_abs_voltage_delta_v,rmse_voltage_delta_v
+rectifier,iterative,inverse,4000,4004,5,0,0,4,5.8975047e-13,2.7708156e-13
+rectifier,iterative,inverse-rank1,4000,4004,1,4,0,4,5.8975047e-13,2.7708156e-13
+rectifier,predicted,inverse,4000,4000,5,0,0,4,7.4429352e-13,2.7930645e-13
+rectifier,predicted,inverse-rank1,4000,4000,1,4,0,4,7.4429352e-13,2.7930645e-13
+rectifier,guarded,inverse,4000,4001,5,0,0,4,7.4429352e-13,2.7930645e-13
+rectifier,guarded,inverse-rank1,4000,4001,1,4,0,4,7.4429352e-13,2.7930645e-13
+rectifier,adaptive,inverse,4000,4002,5,0,0,4,7.4429352e-13,2.7913958e-13
+rectifier,adaptive,inverse-rank1,4000,4002,1,4,0,4,7.4429352e-13,2.7913958e-13
+rectifier,hysteretic-corrected,inverse,4000,4004,5,0,0,4,7.3008266e-13,2.7215533e-13
+rectifier,hysteretic-corrected,inverse-rank1,4000,4004,1,4,0,4,7.3008266e-13,2.7215533e-13
+fullwave_rect,iterative,inverse,4000,4008,9,0,0,8,2.8371226e-8,2.4176516e-8
+fullwave_rect,iterative,inverse-rank1,4000,4008,5,8,4,8,2.8371226e-8,2.4176516e-8
+fullwave_rect,predicted,inverse,4000,4000,9,0,0,8,2.8370519e-8,2.4070690e-8
+fullwave_rect,predicted,inverse-rank1,4000,4000,5,8,4,8,2.8370519e-8,2.4070690e-8
+fullwave_rect,guarded,inverse,4000,4000,9,0,0,8,2.8370519e-8,2.4070690e-8
+fullwave_rect,guarded,inverse-rank1,4000,4000,5,8,4,8,2.8370519e-8,2.4070690e-8
+fullwave_rect,adaptive,inverse,4000,4001,9,0,0,8,2.8371226e-8,2.4074202e-8
+fullwave_rect,adaptive,inverse-rank1,4000,4001,5,8,4,8,2.8371226e-8,2.4074202e-8
+fullwave_rect,hysteretic-corrected,inverse,4000,4008,9,0,0,8,2.8371226e-8,2.4077571e-8
+fullwave_rect,hysteretic-corrected,inverse-rank1,4000,4008,5,8,4,8,2.8371226e-8,2.4077571e-8
+diode_clipper,iterative,inverse,4000,4008,9,0,0,8,6.3214545e-11,7.4071702e-12
+diode_clipper,iterative,inverse-rank1,4000,4008,1,8,0,8,6.3214545e-11,7.4071702e-12
+diode_clipper,predicted,inverse,4000,4000,2,0,0,1,3.2862602e-14,3.1887568e-14
+diode_clipper,predicted,inverse-rank1,4000,4000,1,1,0,1,3.2862602e-14,3.1887568e-14
+diode_clipper,guarded,inverse,4000,4001,2,0,0,1,3.2862602e-14,3.1891576e-14
+diode_clipper,guarded,inverse-rank1,4000,4001,1,1,0,1,3.2862602e-14,3.1891576e-14
+diode_clipper,adaptive,inverse,4000,4001,2,0,0,1,3.2862602e-14,3.1891576e-14
+diode_clipper,adaptive,inverse-rank1,4000,4001,1,1,0,1,3.2862602e-14,3.1891576e-14
+diode_clipper,hysteretic-corrected,inverse,4000,4001,2,0,0,1,3.2862602e-14,3.1891576e-14
+diode_clipper,hysteretic-corrected,inverse-rank1,4000,4001,1,1,0,1,3.2862602e-14,3.1891576e-14
+freewheel,iterative,inverse,4000,4001,3,0,0,2,1.1001977e-11,8.5593413e-12
+freewheel,iterative,inverse-rank1,4000,4001,2,1,0,2,1.1001977e-11,8.5593413e-12
+freewheel,predicted,inverse,4000,4000,3,0,0,2,9.8959729e-12,7.6958931e-12
+freewheel,predicted,inverse-rank1,4000,4000,2,1,0,2,9.8959729e-12,7.6958931e-12
+freewheel,guarded,inverse,4000,4001,3,0,0,2,1.1001977e-11,8.5593413e-12
+freewheel,guarded,inverse-rank1,4000,4001,2,1,0,2,1.1001977e-11,8.5593413e-12
+freewheel,adaptive,inverse,4000,4001,3,0,0,2,1.1001977e-11,8.5593413e-12
+freewheel,adaptive,inverse-rank1,4000,4001,2,1,0,2,1.1001977e-11,8.5593413e-12
+freewheel,hysteretic-corrected,inverse,4000,4001,3,0,0,2,1.1001977e-11,8.5593413e-12
+freewheel,hysteretic-corrected,inverse-rank1,4000,4001,2,1,0,2,1.1001977e-11,8.5593413e-12

@@ -1,0 +1,13 @@
+# Node.js v22.16.0, AMD EPYC 9V74 shared CPU quota 4; 24 conductance transitions.
+# 5 repetitions within each process, rotating method order, warmup.
+# Each row records median milliseconds for a synthetic MNA dense linear algebra workload.
+# 1 RHS versus 32 RHS per fixed matrix state; not full EDA end-to-end timing.
+mna_dimension,rhs_per_event,gji_median_ms,lu_median_ms,rank1_median_ms,linear_solutions,full_inverse_count,lu_factorizations,rank1_full_inverse_count,rank1_updates
+32,1,6.772088,1.898959,1.738417,24,25,25,1,24
+64,1,49.766927,11.045182,8.483680,24,25,25,1,24
+96,1,166.996074,35.086823,19.962319,24,25,25,1,24
+128,1,377.650283,73.347083,33.120345,24,25,25,1,24
+32,32,21.127751,6.243116,15.412214,768,25,25,1,24
+64,32,97.944924,22.649095,55.111849,768,25,25,1,24
+96,32,257.492986,65.424252,119.147544,768,25,25,1,24
+128,32,501.915754,117.861574,202.137541,768,25,25,1,24

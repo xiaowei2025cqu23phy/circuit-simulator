@@ -7,10 +7,17 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "test": "node --test src/sim/engine.test.mjs",
+    "test": "node --test src/sim/*.test.mjs",
     "preview": "vite preview",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist",
+    "benchmark:hsp": "node scripts/compare-hsp-mna.mjs",
+    "benchmark:hsp:adaptive": "node scripts/adaptive-sensitivity.mjs",
+    "benchmark:hsp:lu": "node scripts/compare-linear-solvers.mjs",
+    "benchmark:hsp:event": "node scripts/compare-event-refinement.mjs",
+    "benchmark:hsp:secant": "node scripts/compare-event-estimate.mjs",
+    "benchmark:hsp:rank1": "node scripts/compare-rank-one.mjs",
+    "benchmark:hsp:scale": "node scripts/benchmark-mna-scaling.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.8.0",

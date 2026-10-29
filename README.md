@@ -23,8 +23,8 @@
 - **键盘快捷键** - Q/M/W/R/C/L/D/S/V/I/G/T/N/X 一键切换工具
 
 ### 🧮 仿真引擎
-- **改进的节点分析法（MNA）** - 部分主元高斯消元求解，对角 GMIN 保证数值稳定
-- **后向欧拉积分** - 电容/电感采用精确伴随模型，无条件稳定
+- **修正节点分析法（MNA）** - 当前采用带部分主元的 Gauss–Jordan 逆矩阵与矩阵向量乘法；GMIN 仅缓解部分病态情形，并不保证任意拓扑可逆
+- **后向欧拉积分** - 电容/电感采用一阶伴随模型；该积分法对适用的线性测试问题具有 A 稳定性，但不保证整个开关电路总是稳定
 - **多种源类型支持**:
   - DC 电源、AC 正弦波源（可设初相位）、阶跃 (STEP)
   - 方波（可设占空比）、三角波、脉冲波、指数波
@@ -98,7 +98,7 @@ circuit-simulator/
 
 #### 🧮 求解器
 - 部分主元 Gauss-Jordan 求逆（编译时一次求逆，逐时间步 O(n²) 矩阵乘）
-- 对角 GMIN（1e-12）保证可解性，奇异矩阵给出明确报错
+- 节点 GMIN（1e-12 S）提供弱对地连接，但不保证所有 MNA 系统可逆；奇异矩阵需要单独检测
 
 #### 🎨 绘图系统
 - SVG 元件渲染（memo 优化）+ Canvas 示波器（HiDPI、抽稀采样）
@@ -350,3 +350,120 @@ npm test
 - 📧 **Email**: [cqu.phy.23xiaowei@qq.com](mailto:cqu.phy.23xiaowei@qq.com)
 - 🐛 **提交 Issue**: [GitHub Issues](https://github.com/xiaowei2025cqu23phy/circuit-simulator/issues)
 - 💡 **讨论**: [GitHub Discussions](https://github.com/xiaowei2025cqu23phy/circuit-simulator/discussions)
+
+
+---
+
+## 🔬 HSP-MNA 研究模式（独立分支）
+
+研究分支 `research/hsp-mna-validation` 增加了**可选**的三种基于相同双阈值状态机的实验模式；默认仍是现有的二极管步内校正迭代器。
+
+```js
+const baseline = compileCircuit(elements, dt); // 默认：步内二极管状态校正
+const predicted = compileCircuit(elements, dt, { diodeSolver: 'predicted' });
+const guarded = compileCircuit(elements, dt, { diodeSolver: 'guarded', correctionGuard: 0.015 });
+const corrected = compileCircuit(elements, dt, { diodeSolver: 'hysteretic-corrected' });
+stepEngine(guarded);
+console.log(guarded.diagnostics);
+```
+
+- 双阈值预测为 0.70 V（由 OFF 转 ON）与 0.65 V（由 ON 转 OFF），使用上一时间步**已接受的节点解**决定本步离散状态；这与真实二极管物理模型不等价。
+- `engine.diagnostics` 记录求解次数、矩阵重构次数、端点状态校正次数、未解决的状态迭代次数及状态不一致计数。
+- **公平的三模式研究比较**：`npm run benchmark:hsp > comparison.csv`，采用相同双阈值状态机和 1 μs 同模型细步长参考波形。
+- **研究结果与失效例**：[三模式对照及续流失效分析](docs/three-mode-benchmark.md)；[实验 CSV](research/engine_three_mode_v8_results.csv)。原始工程基线的反向电流关断策略不同，不参与同模型精度优劣结论。
+- 电路仍只有二极管和手动/定时开关；论文中 BJT/MOSFET 的表达目前属于**模型设计与理论推导**，不是当前 JavaScript 引擎中已实现的器件。
+- 研究模式的误差与计算收益必须用同一器件模型及时间网格进行对照验证；不应从单次求解特性直接宣称实际速度提升。由于 GitHub Actions 账户配额限制，CI 运行状态并不代表代码测试结果，请本地执行 `npm test`、`npm run lint`、`npm run build`。
+
+详见 [HSP-MNA 研究方法说明](docs/hsp-mna-research.md)。
+
+
+### 第四轮：自适应状态校正（研究模式，不改默认引擎）
+
+新增 `compileCircuit(elements, dt, { diodeSolver: 'adaptive', correctionGuard: 0.015, adaptiveScale: 0.2 })`。使用与其他三个研究模式相同的 0.70/0.65 V 迟滞 PWL 模型，自适应校正容差为 `gamma=gammaMax/(1+max|deltaVD|/adaptiveScale)`。这是启发式触发条件，**不是严格误差上界，也不保证无条件稳定**。
+
+研究工具：
+
+```bash
+npm test
+npm run benchmark:hsp > four_modes.csv
+npm run benchmark:hsp:adaptive > adaptive_sensitivity.csv
+```
+
+运行限制：本轮读取仓库实际 JavaScript 源码，在隔离 V8 中执行测试逻辑，**37/37 通过**；但受本地仓库不可克隆及 Actions 账单因素影响，尚未完整执行 Node npm、lint 或构建。并未运行 ngspice。详见 [第四轮报告](docs/adaptive-study.md) 和 [四模式结果 CSV](research/engine_four_mode_v8_results.csv)。实验性分支未经合并，勿称为稳定发行版。
+
+
+### 第五轮：稠密 LU 复用与定时事件对齐（非默认实验接口）
+
+`compileCircuit(elements, dt, { linearSolver: 'lu' })` 可选用部分主元稠密 LU 分解取代显式逆矩阵。系数矩阵不变时重用分解；二极管 PWL 状态、定时开关状态或动态元件步长改变时重新分解。默认仍为 `linearSolver: 'inverse'`，不会影响既有 UI。
+
+`stepEngineAtScheduledEvents(engine, probeId)` 可选用已知定时开关的 `timeOn/timeOff` 边界截断当前后向欧拉时间步。**它不执行未知二极管状态事件的精确零点定位**，也未修复全局时间采样约定。
+
+```bash
+npm test
+npm run benchmark:hsp:lu > lu_benchmark.csv
+python3 research/physical_diode_dc.py > physical_diode_dc.csv
+```
+
+实际 JavaScript 源码在隔离 V8 中通过 **45/45** 项测试。4 类电路 × 5 种状态策略共 20 组、每组 4,000 步，LU 与逆矩阵的最大节点电压差约 `1.96e-10 V`，未实测真实机器加速比。直流 Shockley 方程参照与 PWL 模型差异属于**模型近似误差**，不是两种线性后端的数值差异。
+
+参见 [第五轮研究记录](docs/fifth-round-lu-and-events.md)、[完整配对 CSV](research/lu_inverse_parity_v8.csv)。GitHub Actions 受账单限制，尚未完成正常 npm/lint/build 全流程验证；本研究 PR 保持 Draft。
+
+
+## 第六轮重要勘误与最新研究结果（2026-10-29）
+
+此前源码将 AC/DC/PULSE 激励取样于时间步起点 `t_n`，但采用后向欧拉储能元件伴随方程。为了符合标准受迫 BE 离散，本研究新增可选 `sourceSampling:'be-end'`，在 `t_{n+1}` 取样独立源、定时开关并修正探针时间戳。**默认 UI 仍为 `legacy-start`；不要混用旧实验误差与新 BE-end 结果。**
+
+新增研究性事件回溯：`src/sim/eventRefinement.js` 提供 `stepEngineWithDiodeRefinement(engine, probeId, {maxHalvings:6})`，可撤销并细分存在二极管状态变化的试算步。它**不是精确二极管根定位**，也没有保证全局误差下降。拒绝试算也计入总线性求解成本。测试逻辑 **53/53** 在隔离 V8 中通过（**不等于** npm/lint/build 完成）。
+
+新的权威实验：
+- [实验与方法学更正报告](docs/sixth-round-events-time-discretization.md)
+- [48 组统一 BE-end 状态策略数据](research/four_mode_be_end_v8_results.csv)
+- [36 组 BE 时刻与事件细分对照](research/event_refinement_v8_results.csv)
+- [20 组 BE-end 自适应尺度](research/adaptive_scale_be_end_v8_results.csv)
+- 复现：`npm run benchmark:hsp:event > events.csv`、`npm run benchmark:hsp > modes.csv`。
+
+这轮直接发现：10 μs 下，半波整流经过事件二分后 RMSE 从 **1.273 mV 增至 4.755 mV**，桥式整流从 **2.926 mV 增至 6.610 mV**，说明朴素二分的代价和误差可能双输；不应作为默认算法。ngspice 尚未运行，物理正确性仍待验证。
+
+
+## 第七轮（研究分支）：割线事件候选与低秩导纳更新
+
+研究接口（不会改变 `main` 或默认 UI）：
+
+```js
+const eng = compileCircuit(elements, 1e-5, {
+  diodeSolver:'hysteretic-corrected',
+  linearSolver:'inverse-rank1', // 可选，原默认依然是 inverse
+  sourceSampling:'be-end',      // 可选，原默认依然是 legacy-start
+});
+
+// 另一种实验：启用二极管割线事件试算（仅 hysteretic-corrected）
+const trial = compileCircuit(elements, 1e-5, {
+  diodeSolver:'hysteretic-corrected', linearSolver:'lu', sourceSampling:'be-end',
+});
+stepEngineWithEstimatedDiodeEvent(trial);
+```
+
+`stepEngineWithEstimatedDiodeEvent` 从 `src/sim/eventEstimate.js` 单独导入；估计来自冻结旧 PWL 状态下的电压端点插值，**不是精确事件根定位**。实验发现割线分步在若干算例中的 RMSE 不如直接端点校正，不能视为已证实的创新优势。
+
+`inverse-rank1` 使用已知的 Sherman-Morrison 公式为单个二极管导纳变化重用已有逆矩阵，并在病态分母、其他器件矩阵变化或最多 32 次累计更新后回退完整求逆。四个示例中的成功更新使完整求逆次数减少，但还**未**完成真实 Node.js 环境下的耗时加速测试。此策略仍是稠密逆矩阵方法，不是稀疏 LU。
+
+```bash
+npm test
+npm run benchmark:hsp:secant > secant.csv
+npm run benchmark:hsp:rank1 > rank_one.csv
+node scripts/rank-one-guard-ablation.mjs > guard_ablation.csv
+```
+
+最新实验和可核查限制见 [第七轮研究报告](docs/seventh-round-secants-rankone.md)、[48 组事件候选数据](research/event_secant_be_end_v8_results.csv) 与 [40 组低秩对照数据](research/rank_one_inverse_v8_results.csv)。隔离 V8 执行实际 JS 测试逻辑 **67/67 项通过**；但完整 npm/lint/build、设备计时与外部 ngspice 仍待验证。实验性改动保留在 Draft PR，不自动合并。
+
+
+## 第八轮：真实 Node.js 的 MNA 型稠密矩阵基准（实验性）
+
+在 Node.js v22.16.0 + 共享 AMD EPYC 9V74 CPU 容器中，采用仓库的 LU、带保护的 Sherman–Morrison 秩一更新和原有 Gauss–Jordan 逆矩阵算法，对合成电阻/理想电压源 MNA 型矩阵进行受控计时。该实验不是完整 React/EDA 引擎端到端性能测试；也不是物理器件 SPICE 精度结果。
+
+- 维数：8、16、32、64、96、128；24 次导纳切换；每状态 8 个右端（192 次线性求解）；七次重复计时。
+- 128 阶计时中位数：完整求逆 465.23 ms、稠密 LU 117.38 ms、秩一更新 91.67 ms。在 64 阶时 LU 更快；并不能声称秩一更新普遍优越。
+- 128 阶/每状态仅 1 RHS：LU 73.35 ms，秩一 33.12 ms；每状态 32 RHS：LU 117.86 ms，秩一 202.14 ms。最优后端与**右端复用量**相关。
+- 同一合成网络中三法残差最大约 1e−14；真正病态的桥式整流例应沿用第七轮的数值分母保护回退。
+
+复现脚本：**scripts/benchmark-mna-scaling.mjs**，命令 **npm run benchmark:hsp:scale**。详见 [第八轮方法与限制](docs/eighth-round-node-benchmark.md)、[原生 Node 数据](research/node22_mna_scaling_results.csv)、[右端数量敏感性表](research/node22_mna_rhs_sensitivity.csv)。真实系统全量 npm/test/lint/build 与 ngspice 物理对照仍待完成；本研究 PR 为 Draft，不合并 main。

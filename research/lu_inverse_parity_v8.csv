@@ -1,0 +1,24 @@
+# Source: actual JavaScript engine in GitHub research branch, evaluated in isolated V8.
+# Compare 2 linear algebra backends, 4 circuit examples, 5 diode-state modes, 4000 steps each, dt=10us.
+# NOT a timing benchmark, NOT an ngspice physical validation.
+circuit,diode_solver,steps,max_abs_difference_v,rmse_difference_v,linear_solves,factorizations,matrix_rebuilds,unresolved_steps,same_solve_count
+rectifier,iterative,4000,7.842615445952106e-13,3.2820850654527805e-13,4004,5,4,0,true
+rectifier,predicted,4000,5.409006575973763e-13,2.0874574618901154e-13,4000,5,4,0,true
+rectifier,guarded,4000,5.409006575973763e-13,2.0874574161632132e-13,4001,5,4,0,true
+rectifier,adaptive,4000,5.409006575973763e-13,2.0856879945661976e-13,4002,5,4,0,true
+rectifier,hysteretic-corrected,4000,5.329070518200751e-13,2.0656375246765576e-13,4004,5,4,0,true
+fullwave_rect,iterative,4000,2.4868995751603507e-13,1.2581109054055434e-13,4008,9,8,0,true
+fullwave_rect,predicted,4000,1.438849039914203e-13,5.524118694577117e-14,4000,9,8,0,true
+fullwave_rect,guarded,4000,1.438849039914203e-13,5.524118694577117e-14,4000,9,8,0,true
+fullwave_rect,adaptive,4000,1.438849039914203e-13,5.5241170066490344e-14,4001,9,8,0,true
+fullwave_rect,hysteretic-corrected,4000,1.4566126083082054e-13,5.690251222389268e-14,4008,9,8,0,true
+diode_clipper,iterative,4000,1.1102230246251565e-16,5.355336091691907e-17,4008,9,8,0,true
+diode_clipper,predicted,4000,1.1102230246251565e-16,5.2905141415347994e-17,4000,2,1,0,true
+diode_clipper,guarded,4000,1.1102230246251565e-16,5.2905141415347994e-17,4001,2,1,0,true
+diode_clipper,adaptive,4000,1.1102230246251565e-16,5.2905141415347994e-17,4001,2,1,0,true
+diode_clipper,hysteretic-corrected,4000,1.1102230246251565e-16,5.2905141415347994e-17,4001,2,1,0,true
+freewheel,iterative,4000,1.865174681370263e-12,3.0105773503526505e-13,4001,3,2,0,true
+freewheel,predicted,4000,1.964508555829525e-10,3.1207145392366505e-12,4000,3,2,0,true
+freewheel,guarded,4000,1.865174681370263e-12,3.0105773503526505e-13,4001,3,2,0,true
+freewheel,adaptive,4000,1.865174681370263e-12,3.0105773503526505e-13,4001,3,2,0,true
+freewheel,hysteretic-corrected,4000,1.865174681370263e-12,3.0105773503526505e-13,4001,3,2,0,true

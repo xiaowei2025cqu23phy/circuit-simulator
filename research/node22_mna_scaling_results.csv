@@ -1,0 +1,24 @@
+# Native Node v22.16.0 isolated synthetic MNA algebra benchmark; captured 2026-10-29.
+# AMD EPYC 9V74 shared container, Debian 13, cgroup cpu.max=400000 100000 (4 CPU quota).
+# 7 repeated timings, rotating order, 24 diode-like conductance switches, 8 RHS per state, 192 solves.
+# Includes warmup per method/size. Does not benchmark full circuit-simulator or ngspice.
+# Values are platform-specific and not universal asymptotic speedups.
+mna_dimension,method,median_ms,q1_ms,q3_ms,complete_factorizations,rank_one_updates,rank_one_fallbacks,linear_solutions,worst_residual_inf,worst_delta_vs_full_inverse_v,events,rhs_per_event,node_version,cpu_model
+8,gauss-jordan-inverse,1.968907,0.848116,4.112872,25,0,0,192,7.105427e-15,0.000000e+0,24,8,v22.16.0,AMD EPYC 9V74 80-Core Processor
+8,dense-lu,0.949230,0.705568,1.625874,25,0,0,192,3.552714e-15,4.440892e-16,24,8,v22.16.0,AMD EPYC 9V74 80-Core Processor
+8,inverse-rank1,1.063785,0.906445,1.404926,1,24,0,192,5.773160e-15,5.495604e-15,24,8,v22.16.0,AMD EPYC 9V74 80-Core Processor
+16,gauss-jordan-inverse,2.889944,2.246120,3.096400,25,0,0,192,7.105427e-15,0.000000e+0,24,8,v22.16.0,AMD EPYC 9V74 80-Core Processor
+16,dense-lu,1.131718,0.868096,4.237833,25,0,0,192,7.105427e-15,6.661338e-16,24,8,v22.16.0,AMD EPYC 9V74 80-Core Processor
+16,inverse-rank1,2.086948,1.688639,3.964796,1,24,0,192,1.371125e-14,1.054712e-14,24,8,v22.16.0,AMD EPYC 9V74 80-Core Processor
+32,gauss-jordan-inverse,12.904486,10.071424,28.673306,25,0,0,192,7.105427e-15,0.000000e+0,24,8,v22.16.0,AMD EPYC 9V74 80-Core Processor
+32,dense-lu,3.286530,2.956105,3.473095,25,0,0,192,7.105427e-15,1.110223e-15,24,8,v22.16.0,AMD EPYC 9V74 80-Core Processor
+32,inverse-rank1,9.036883,5.395522,10.724791,1,24,0,192,1.065814e-14,7.993606e-15,24,8,v22.16.0,AMD EPYC 9V74 80-Core Processor
+64,gauss-jordan-inverse,87.902815,78.228845,90.693827,25,0,0,192,7.105427e-15,0.000000e+0,24,8,v22.16.0,AMD EPYC 9V74 80-Core Processor
+64,dense-lu,17.715978,16.389244,24.354411,25,0,0,192,7.105427e-15,1.554312e-15,24,8,v22.16.0,AMD EPYC 9V74 80-Core Processor
+64,inverse-rank1,25.686663,22.366623,28.976797,1,24,0,192,7.105427e-15,4.996004e-15,24,8,v22.16.0,AMD EPYC 9V74 80-Core Processor
+96,gauss-jordan-inverse,216.824932,215.570973,255.881156,25,0,0,192,1.065814e-14,0.000000e+0,24,8,v22.16.0,AMD EPYC 9V74 80-Core Processor
+96,dense-lu,47.295784,43.877979,51.090918,25,0,0,192,7.105427e-15,1.998401e-15,24,8,v22.16.0,AMD EPYC 9V74 80-Core Processor
+96,inverse-rank1,47.031668,44.509509,56.920096,1,24,0,192,7.105427e-15,3.774758e-15,24,8,v22.16.0,AMD EPYC 9V74 80-Core Processor
+128,gauss-jordan-inverse,465.226120,449.790955,520.644509,25,0,0,192,7.105427e-15,0.000000e+0,24,8,v22.16.0,AMD EPYC 9V74 80-Core Processor
+128,dense-lu,117.379838,87.466627,126.722882,25,0,0,192,7.105427e-15,1.998401e-15,24,8,v22.16.0,AMD EPYC 9V74 80-Core Processor
+128,inverse-rank1,91.665092,76.120074,112.942419,1,24,0,192,8.326673e-15,9.992007e-15,24,8,v22.16.0,AMD EPYC 9V74 80-Core Processor

@@ -1,0 +1,24 @@
+# Adaptivity study · 40 ms, dt=10 us, matching hysteretic-PWL reference at dt=1 us
+# The exact JavaScript simulation source was executed in an isolated V8 runtime.
+# This is NOT measured ngspice or hardware performance.
+circuit,scale_v,rmse_v,linear_solves,state_disagreements
+rectifier,0.02,0.016303906862005668,4002,2
+rectifier,0.1,0.016303906862005668,4002,2
+rectifier,0.2,0.016303906862005668,4002,2
+rectifier,1,0.016303906862005668,4002,2
+rectifier,10,0.016303906862005668,4002,2
+fullwave_rect,0.02,0.01949569440252518,4004,8
+fullwave_rect,0.1,0.01949569440252518,4004,8
+fullwave_rect,0.2,0.01951751615290383,4001,14
+fullwave_rect,1,0.01952389427360067,4000,16
+fullwave_rect,10,0.01952389427360067,4000,16
+diode_clipper,0.02,0.0021005197207870484,4001,0
+diode_clipper,0.1,0.0021005197207870484,4001,0
+diode_clipper,0.2,0.0021005197207870484,4001,0
+diode_clipper,1,0.0021005197207870484,4001,0
+diode_clipper,10,0.0021005197207870484,4001,0
+freewheel,0.02,0.09059880968326017,4001,0
+freewheel,0.1,0.09059880968326017,4001,0
+freewheel,0.2,0.09059880968326017,4001,0
+freewheel,1,0.09059880968326017,4001,0
+freewheel,10,0.09059880968326017,4001,0
