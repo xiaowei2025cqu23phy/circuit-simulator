@@ -119,6 +119,8 @@ for(const n of sizes){
     for(const trial of a) for(let k=0;k<reference.length;k++)
       for(let j=0;j<n;j++) maxDelta=Math.max(maxDelta,
         Math.abs(trial.values[k][j]-reference[k][j]));
+    if (!Number.isFinite(maxDelta) || maxDelta > 1e-7) throw new Error(`Solver parity failure: N=${n}, ${method}, ${maxDelta}`);
+    if(a.some(x => !Number.isFinite(x.residual) || x.residual > 1e-7)) throw new Error(`Residual failure: N=${n}, ${method}`);
     const [q1,mid,q3]=quantile(a.map(x=>x.elapsed));
     const row={
       mna_dimension:n,method,median_ms:mid.toFixed(6),q1_ms:q1.toFixed(6),q3_ms:q3.toFixed(6),
