@@ -17,6 +17,7 @@ export const DEFAULT_DT = 1e-5;     // 默认仿真步长 10µs
 export const HISTORY_MAX = 250000;  // 波形历史最大点数
 import { predictDiodeStates, countDiodeStateDisagreements, endpointDiodeUpdates, adaptiveDiodeGuard } from './statePrediction.js';
 import { factorizeLU, solveLU } from './linearSolve.js';
+import { updateInverseForConductanceBranch } from './rankOneUpdate.js';
 
 // ---------- 并查集：导线/标签/接地节点合并 ----------
 export class DSU {
@@ -246,7 +247,10 @@ export function compileCircuit(els, dt = DEFAULT_DT, options = {}) {
   const linearSolver = options.linearSolver ?? 'inverse';
   const sourceSampling = options.sourceSampling ?? 'legacy-start';
   if (!['legacy-start', 'be-end'].includes(sourceSampling)) throw new Error('未知源信号采样约定');
-  if (!['inverse', 'lu'].includes(linearSolver)) throw new Error('未知线性求解模式');
+  if (!['inverse', 'lu', 'inverse-rank1'].includes(linearSolver)) throw new Error('未知线性求解模式');
+  const maxRankOneUpdates = options.maxRankOneUpdates ?? 32;
+  if (!Number.isInteger(maxRankOneUpdates) || maxRankOneUpdates < 1 || maxRankOneUpdates > 512)
+    throw new Error('秩一更新次数上限应为 1 到 512 之间的整数');
   if (!['iterative', 'predicted', 'guarded', 'hysteretic-corrected', 'adaptive'].includes(diodeSolver)) throw new Error('未知二极管求解模式');
   const correctionGuard = options.correctionGuard ?? 0.015;
   if (!Number.isFinite(correctionGuard) || correctionGuard < 0) throw new Error('校正容差必须为非负有限数');
@@ -374,7 +378,7 @@ export function compileCircuit(els, dt = DEFAULT_DT, options = {}) {
   });
 
   const A = buildMNA(N, M, dt, validEls, branchEls, switchStates);
-  const A_inv = linearSolver === 'inverse' ? invertMatrix(A) : null;
+  const A_inv = linearSolver !== 'lu' ? invertMatrix(A) : null;
   const luFactors = linearSolver === 'lu' ? factorizeLU(A) : null;
   if (!(A_inv || luFactors)) throw new Error('电路拓扑存在悬空节点或非法连接（无法求解），请检查电路是否完整。');
 
@@ -384,12 +388,13 @@ export function compileCircuit(els, dt = DEFAULT_DT, options = {}) {
 
   return {
     dt, nominalDt: dt, eventAwareTime: false, sourceSampling, t: 0, size, N, M, A_inv, luFactors, linearSolver, validEls, branchEls, branchMap, dsu, nodeMap, finalGroundRoot,
+    factorStates: { ...switchStates }, factorDt: dt, rankOneSinceFull: 0, maxRankOneUpdates,
     state: {}, history: [], currentNodes: {}, allEls: engineEls, switchStates,
     needsMatrixRebuild: false, lastMeasured: null, lastUiTime: 0,
     diodeSolver, correctionGuard, adaptiveScale, previousSolution: null,
     diagnostics: { steps: 0, linearSolves: 0, matrixRebuilds: 0, stateDisagreements: 0, unresolvedSteps: 0,
       stateCorrections: 0, stepsWithCorrections: 0, adaptiveTightenedSteps: 0,
-      factorizations: 1, alignedTimeEvents: 0 },
+      factorizations: 1, alignedTimeEvents: 0, rankOneUpdates: 0, rankOneFallbacks: 0 },
   };
 }
 
@@ -415,18 +420,46 @@ export function stepEngine(eng, probeId = null) {
   //    使二极管通断在本步内收敛，避免"一步延迟"造成的伪尖峰。
   const assembleAndSolve = () => {
     if (eng.needsMatrixRebuild) {
-      const A_new = buildMNA(eng.N, eng.M, dt, validEls, eng.branchEls, switchStates);
-      if (eng.linearSolver === 'lu') {
-        const factors = factorizeLU(A_new);
-        if (!factors) throw new Error('状态切换后 MNA 矩阵无法 LU 分解');
-        eng.luFactors = factors;
-      } else {
-        const inv = invertMatrix(A_new);
-        if (!inv) throw new Error('状态切换后 MNA 矩阵不可逆，已停止仿真');
-        eng.A_inv = inv;
+      let reused = false;
+      if (eng.linearSolver === 'inverse-rank1' && eng.factorDt === dt) {
+        const changed = validEls.filter(el => el.type === 'diode' || el.type === 'switch')
+          .filter(el => Boolean(eng.factorStates[el.id]) !== Boolean(switchStates[el.id]));
+        const onlyDiodes = changed.length > 0 && changed.every(el => el.type === 'diode');
+        if (onlyDiodes && eng.rankOneSinceFull + changed.length <= eng.maxRankOneUpdates) {
+          let nextInverse = eng.A_inv;
+          for (const el of changed) {
+            const nextG = switchStates[el.id] ? 20 : 1e-8;
+            const oldG = eng.factorStates[el.id] ? 20 : 1e-8;
+            nextInverse = updateInverseForConductanceBranch(nextInverse, el.n1, el.n2, nextG - oldG);
+            if (!nextInverse) break;
+          }
+          if (nextInverse) {
+            eng.A_inv = nextInverse;
+            eng.rankOneSinceFull += changed.length;
+            eng.diagnostics.rankOneUpdates += changed.length;
+            reused = true;
+          } else {
+            eng.diagnostics.rankOneFallbacks += 1;
+          }
+        }
       }
+      if (!reused) {
+        const A_new = buildMNA(eng.N, eng.M, dt, validEls, eng.branchEls, switchStates);
+        if (eng.linearSolver === 'lu') {
+          const factors = factorizeLU(A_new);
+          if (!factors) throw new Error('状态切换后 MNA 矩阵无法 LU 分解');
+          eng.luFactors = factors;
+        } else {
+          const inv = invertMatrix(A_new);
+          if (!inv) throw new Error('状态切换后 MNA 矩阵不可逆，已停止仿真');
+          eng.A_inv = inv;
+        }
+        eng.diagnostics.factorizations += 1;
+        eng.rankOneSinceFull = 0;
+      }
+      eng.factorStates = { ...switchStates };
+      eng.factorDt = dt;
       eng.diagnostics.matrixRebuilds += 1;
-      eng.diagnostics.factorizations += 1;
       eng.needsMatrixRebuild = false;
     }
     const b = Array(size).fill(0);
