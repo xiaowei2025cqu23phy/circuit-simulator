@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compileCircuit, stepEngine } from './engine.js';
 import { predictDiodeStates, countDiodeStateDisagreements } from './statePrediction.js';
+import { PREDEFINED_CIRCUITS } from './circuits.js';
 
 const point = (x, y) => ({ x, y });
 const diodeCircuit = () => [
@@ -86,4 +87,22 @@ test('端点校正能报告状态修正；单次预测暴露一步延迟', () =>
 test('对非法研究参数给出明确错误', () => {
   assert.throws(() => compileCircuit(diodeCircuit(), 1e-5, { diodeSolver: 'unknown' }), /未知/);
   assert.throws(() => compileCircuit(diodeCircuit(), 1e-5, { diodeSolver: 'guarded', correctionGuard: -0.1 }), /容差/);
+});
+
+test('电感续流断开事件触发混合模式的关键校正', () => {
+  const elements = PREDEFINED_CIRCUITS.freewheel.elements;
+  const predicted = compileCircuit(elements, 1e-5, { diodeSolver: 'predicted' });
+  const guarded = compileCircuit(elements, 1e-5, { diodeSolver: 'guarded', correctionGuard: 0.015 });
+  let guardedMin = Infinity;
+  for (let i = 0; i < 2000; i++) {
+    stepEngine(predicted);
+    stepEngine(guarded);
+    const v = guarded.currentNodes[ptToStr({ x: 360, y: 260 })];
+    guardedMin = Math.min(guardedMin, v);
+  }
+  assert.equal(predicted.diagnostics.linearSolves, 2000);
+  assert.ok(predicted.diagnostics.stateDisagreements > 0, '预测态应暴露状态滞后风险');
+  assert.ok(guarded.diagnostics.stateCorrections > 0, '关键切换事件应得到校正');
+  assert.equal(guarded.diagnostics.stateDisagreements, 0);
+  assert.ok(guardedMin > -2, '混合校正在现有续流示例中应限制负尖峰');
 });
