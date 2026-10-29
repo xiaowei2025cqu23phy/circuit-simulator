@@ -455,3 +455,15 @@ node scripts/rank-one-guard-ablation.mjs > guard_ablation.csv
 ```
 
 最新实验和可核查限制见 [第七轮研究报告](docs/seventh-round-secants-rankone.md)、[48 组事件候选数据](research/event_secant_be_end_v8_results.csv) 与 [40 组低秩对照数据](research/rank_one_inverse_v8_results.csv)。隔离 V8 执行实际 JS 测试逻辑 **67/67 项通过**；但完整 npm/lint/build、设备计时与外部 ngspice 仍待验证。实验性改动保留在 Draft PR，不自动合并。
+
+
+## 第八轮：真实 Node.js 的 MNA 型稠密矩阵基准（实验性）
+
+在 Node.js v22.16.0 + 共享 AMD EPYC 9V74 CPU 容器中，采用仓库的 LU、带保护的 Sherman–Morrison 秩一更新和原有 Gauss–Jordan 逆矩阵算法，对合成电阻/理想电压源 MNA 型矩阵进行受控计时。该实验不是完整 React/EDA 引擎端到端性能测试；也不是物理器件 SPICE 精度结果。
+
+- 维数：8、16、32、64、96、128；24 次导纳切换；每状态 8 个右端（192 次线性求解）；七次重复计时。
+- 128 阶计时中位数：完整求逆 465.23 ms、稠密 LU 117.38 ms、秩一更新 91.67 ms。在 64 阶时 LU 更快；并不能声称秩一更新普遍优越。
+- 128 阶/每状态仅 1 RHS：LU 73.35 ms，秩一 33.12 ms；每状态 32 RHS：LU 117.86 ms，秩一 202.14 ms。最优后端与**右端复用量**相关。
+- 同一合成网络中三法残差最大约 1e−14；真正病态的桥式整流例应沿用第七轮的数值分母保护回退。
+
+复现脚本：**scripts/benchmark-mna-scaling.mjs**，命令 **npm run benchmark:hsp:scale**。详见 [第八轮方法与限制](docs/eighth-round-node-benchmark.md)、[原生 Node 数据](research/node22_mna_scaling_results.csv)、[右端数量敏感性表](research/node22_mna_rhs_sensitivity.csv)。真实系统全量 npm/test/lint/build 与 ngspice 物理对照仍待完成；本研究 PR 为 Draft，不合并 main。
