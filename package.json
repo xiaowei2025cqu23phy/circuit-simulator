@@ -17,7 +17,8 @@
     "benchmark:hsp:event": "node scripts/compare-event-refinement.mjs",
     "benchmark:hsp:secant": "node scripts/compare-event-estimate.mjs",
     "benchmark:hsp:rank1": "node scripts/compare-rank-one.mjs",
-    "benchmark:hsp:scale": "node scripts/benchmark-mna-scaling.mjs"
+    "benchmark:hsp:scale": "node scripts/benchmark-mna-scaling.mjs",
+    "benchmark:hsp:topologies": "node scripts/benchmark-multi-topology.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.8.0",
