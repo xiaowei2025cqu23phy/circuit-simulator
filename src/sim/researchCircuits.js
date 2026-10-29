@@ -8,9 +8,9 @@
  * NO React/UI state or random inputs. These are electrical fixtures,
  * not benchmark timing results or external SPICE reference netlists.
  */
-const point = (x, y) => ({ x, y });
-const SOURCE_POS = point(0, 40);
-const GROUND = point(0, 0);
+const fixturePoint = (x, y) => ({ x, y });
+const SOURCE_POS = fixturePoint(0, 40);
+const GROUND = fixturePoint(0, 0);
 const validCount = (n, max = 64) =>
   Number.isInteger(n) && n >= 2 && n <= max;
 
@@ -33,8 +33,8 @@ export function makeParallelDiodeBank(count, {
     { id: 'gnd', type: 'ground', p1: GROUND },
   ];
   for (let i = 0; i < count; i++) {
-    const a = point(80, 80 + 40 * i);
-    const b = point(160, 80 + 40 * i);
+    const a = fixturePoint(80, 80 + 40 * i);
+    const b = fixturePoint(160, 80 + 40 * i);
     elements.push({ id: 'feed'+i, type: 'resistor', p1: SOURCE_POS, p2: a,
       value: 100 + (i % 3) * 80 });
     elements.push({ id: 'diode'+i, type: 'diode', p1: a, p2: b });
@@ -43,7 +43,7 @@ export function makeParallelDiodeBank(count, {
     elements.push({ id: 'cap'+i, type: 'capacitor', p1: b, p2: GROUND,
       value: 1e-6 + (i % 4) * 0.5e-6 });
   }
-  elements.push({ id: 'probe', type: 'terminal', name: 'VOUT', p1: point(160, 80) });
+  elements.push({ id: 'probe', type: 'terminal', name: 'VOUT', p1: fixturePoint(160, 80) });
   return elements;
 }
 
@@ -70,7 +70,7 @@ export function makeReactiveLadder(stages, {
   ];
   let previous = SOURCE_POS;
   for (let i = 0; i < stages; i++) {
-    const next = point(80 + 80 * i, 40);
+    const next = fixturePoint(80 + 80 * i, 40);
     if (kind === 'rc') {
       elements.push({ id:'series-r'+i, type:'resistor',
         p1:previous, p2:next, value:150 + 25*(i%4) });
@@ -78,7 +78,7 @@ export function makeReactiveLadder(stages, {
       elements.push({ id:'series-l'+i, type:'inductor',
         p1:previous, p2:next, value:0.010+0.002*(i%4) });
     } else {
-      const intermediate = point(40 + 80 * i, 40);
+      const intermediate = fixturePoint(40 + 80 * i, 40);
       elements.push({ id:'series-r'+i, type:'resistor',
         p1:previous, p2:intermediate, value:100+20*(i%4) });
       elements.push({ id:'series-l'+i, type:'inductor',
