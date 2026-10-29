@@ -407,3 +407,19 @@ python3 research/physical_diode_dc.py > physical_diode_dc.csv
 实际 JavaScript 源码在隔离 V8 中通过 **45/45** 项测试。4 类电路 × 5 种状态策略共 20 组、每组 4,000 步，LU 与逆矩阵的最大节点电压差约 `1.96e-10 V`，未实测真实机器加速比。直流 Shockley 方程参照与 PWL 模型差异属于**模型近似误差**，不是两种线性后端的数值差异。
 
 参见 [第五轮研究记录](docs/fifth-round-lu-and-events.md)、[完整配对 CSV](research/lu_inverse_parity_v8.csv)。GitHub Actions 受账单限制，尚未完成正常 npm/lint/build 全流程验证；本研究 PR 保持 Draft。
+
+
+## 第六轮重要勘误与最新研究结果（2026-10-29）
+
+此前源码将 AC/DC/PULSE 激励取样于时间步起点 `t_n`，但采用后向欧拉储能元件伴随方程。为了符合标准受迫 BE 离散，本研究新增可选 `sourceSampling:'be-end'`，在 `t_{n+1}` 取样独立源、定时开关并修正探针时间戳。**默认 UI 仍为 `legacy-start`；不要混用旧实验误差与新 BE-end 结果。**
+
+新增研究性事件回溯：`src/sim/eventRefinement.js` 提供 `stepEngineWithDiodeRefinement(engine, probeId, {maxHalvings:6})`，可撤销并细分存在二极管状态变化的试算步。它**不是精确二极管根定位**，也没有保证全局误差下降。拒绝试算也计入总线性求解成本。测试逻辑 **53/53** 在隔离 V8 中通过（**不等于** npm/lint/build 完成）。
+
+新的权威实验：
+- [实验与方法学更正报告](docs/sixth-round-events-time-discretization.md)
+- [48 组统一 BE-end 状态策略数据](research/four_mode_be_end_v8_results.csv)
+- [36 组 BE 时刻与事件细分对照](research/event_refinement_v8_results.csv)
+- [20 组 BE-end 自适应尺度](research/adaptive_scale_be_end_v8_results.csv)
+- 复现：`npm run benchmark:hsp:event > events.csv`、`npm run benchmark:hsp > modes.csv`。
+
+这轮直接发现：10 μs 下，半波整流经过事件二分后 RMSE 从 **1.273 mV 增至 4.755 mV**，桥式整流从 **2.926 mV 增至 6.610 mV**，说明朴素二分的代价和误差可能双输；不应作为默认算法。ngspice 尚未运行，物理正确性仍待验证。
