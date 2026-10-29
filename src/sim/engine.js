@@ -450,6 +450,7 @@ export function stepEngine(eng, probeId = null) {
     // Guarded and endpoint-corrected modes may perform extra solves when the
     // *current* endpoint violates the same hysteresis transition law.
     let settled = false;
+    let correctedThisStep = false;
     let statesUsedForLastSolve = null;
     for (let iter = 0; iter < 12; iter++) {
       statesUsedForLastSolve = { ...switchStates };
@@ -461,6 +462,7 @@ export function stepEngine(eng, probeId = null) {
       if (updates.length === 0) { settled = true; break; }
       for (const update of updates) switchStates[update.id] = update.nextOn;
       eng.diagnostics.stateCorrections += updates.length;
+      correctedThisStep = true;
       eng.needsMatrixRebuild = true;
     }
     if (!settled) {
@@ -471,6 +473,7 @@ export function stepEngine(eng, probeId = null) {
       Object.assign(switchStates, statesUsedForLastSolve);
       eng.needsMatrixRebuild = false;
     }
+    if (correctedThisStep) eng.diagnostics.stepsWithCorrections += 1;
     eng.diagnostics.stateDisagreements += countDiodeStateDisagreements(validEls, switchStates, x);
   } else {
     // Legacy baseline: retains reverse-current release criterion and is NOT
