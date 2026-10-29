@@ -1,0 +1,24 @@
+# Actual JS source in isolated V8; BE endpoint-sampled, dense LU, same PWL model.
+# 4 preconfigured circuits x 5 adaptive scales; 40ms, dt=10us, dt_ref=1us.
+# This is not SPICE physical validation or wall-clock benchmark.
+circuit,source_sampling,scale_v,rmse_v,linear_solves,state_disagreements,unresolved_steps
+rectifier,be-end,0.02,0.0137474721,4002,2,0
+rectifier,be-end,0.1,0.0137474721,4002,2,0
+rectifier,be-end,0.2,0.0137474721,4002,2,0
+rectifier,be-end,1,0.0137474721,4002,2,0
+rectifier,be-end,10,0.0137474721,4002,2,0
+fullwave_rect,be-end,0.02,0.0168942084,4004,8,0
+fullwave_rect,be-end,0.1,0.0168942084,4004,8,0
+fullwave_rect,be-end,0.2,0.0169049892,4001,14,0
+fullwave_rect,be-end,1,0.0169037314,4000,16,0
+fullwave_rect,be-end,10,0.0169037314,4000,16,0
+diode_clipper,be-end,0.02,8.86882870e-15,4001,0,0
+diode_clipper,be-end,0.1,8.86882870e-15,4001,0,0
+diode_clipper,be-end,0.2,8.86882870e-15,4001,0,0
+diode_clipper,be-end,1,8.86882870e-15,4001,0,0
+diode_clipper,be-end,10,8.86882870e-15,4001,0,0
+freewheel,be-end,0.02,7.05474769e-9,4001,0,0
+freewheel,be-end,0.1,7.05474769e-9,4001,0,0
+freewheel,be-end,0.2,7.05474769e-9,4001,0,0
+freewheel,be-end,1,7.05474769e-9,4001,0,0
+freewheel,be-end,10,7.05474769e-9,4001,0,0
