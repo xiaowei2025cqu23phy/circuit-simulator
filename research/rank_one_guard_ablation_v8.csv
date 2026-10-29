@@ -1,0 +1,10 @@
+# Source: actual GitHub JavaScript engine in isolated V8; bridge rectifier 10us / 40ms.
+# This ablation intentionally permits unsafe near-singular rank-one updates for research.
+# The shipped default guard is 1e-6, NOT 1e-8. Data are not physical SPICE measurements.
+mode,floor,linear_solver,max_abs_voltage_delta_v,rmse_voltage_delta_v,linear_solves,complete_inversions,rank_one_updates,rank_one_fallbacks,matrix_state_changes,unresolved_steps
+guarded,1e-8,inverse-rank1,0.00483587142487,0.000233523842936,4010,1,27,0,20,0
+guarded,0.000001,inverse-rank1,2.83705192672e-8,2.40706900067e-8,4000,5,8,4,8,0
+guarded,0.0001,inverse-rank1,2.83705192672e-8,2.40706900067e-8,4000,5,8,4,8,0
+hysteretic-corrected,1e-8,inverse-rank1,0.0000447304417159,0.0000111711326588,4020,1,27,0,20,0
+hysteretic-corrected,0.000001,inverse-rank1,2.83712255911e-8,2.40775713322e-8,4008,5,8,4,8,0
+hysteretic-corrected,0.0001,inverse-rank1,2.83712255911e-8,2.40775713322e-8,4008,5,8,4,8,0
