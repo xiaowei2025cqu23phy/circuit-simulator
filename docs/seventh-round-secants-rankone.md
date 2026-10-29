@@ -102,7 +102,7 @@ A_new^-1 = A_old^-1 -
 
 ## 4. 代码与测试状态
 
-- 从 GitHub 抽取实际 JavaScript 文件执行 **65 项测试逻辑，65/65 通过**；包含所有上轮 53 项、7 项割线事件估计测试、5 项低秩测试。
+- 从 GitHub 抽取实际 JavaScript 文件执行 **67 项测试逻辑，67/67 通过**；包含所有上轮 53 项、7 项割线事件估计测试、5 项低秩测试。
 - 这仍**不是完整 Node.js 依赖安装、`npm test`、ESLint、Vite build 或 GitHub Actions**；账户 Action 账单限制保持不追查。
 - GitHub `main` 未修改；本文件和新模块只存在研究分支 Draft PR。
 - `ngspice` 尚未安装，已有物理 Shockley SPICE 参考网表未执行。所有上述暂态 RMSE 仅相对于**同一器件宏模型的细网格参考**。
@@ -113,7 +113,20 @@ A_new^-1 = A_old^-1 -
 - M. K. Camlibel, W. P. M. H. Heemels, J. M. Schumacher, “Consistency of a Time-Stepping Method for a Class of Piecewise-Linear Networks,” *IEEE Trans. Circuits Syst. I* **49**(3), 349–357 (2002), DOI [10.1109/81.989170](https://doi.org/10.1109/81.989170). 相关 PWL 网络时间步进一致性先行研究。
 - 已有切换事件定位、状态空间仿真与网络补偿方法，不能把分段线性、事件检测或低秩逆矩阵公式视为首次提出。当前合理的论述是**特定轻量级教学型 EDA 原型中的工程组合、代价可追踪的失败案例和数值稳健性设计**。
 
-## 6. 后续正式投稿前的检验
+## 6. 病态分母消融实验的可复现证据
+
+为了不把“初版失效”当成没有原始记录的逸闻，本轮另加入 `scripts/rank-one-guard-ablation.mjs` 和 `research/rank_one_guard_ablation_v8.csv`。该脚本固定桥式整流、10 μs、40 ms、`sourceSampling:'be-end'`，分别对 `guarded` 和 `hysteretic-corrected` 状态策略设置秩一分母下界 1e-8、1e-6、1e-4，与完全求逆直接配对。
+
+对 **guarded**：
+- 危险下界 1e-8：最大输出电压差 **4.835871×10^-3 V**、需要 4010 次线性求解、只进行 1 次完整求逆却出现错误的额外状态切换。
+- 默认下界 1e-6：最大差 **2.837052×10^-8 V**、4000 次线性求解、5 次完整求逆、8 次低秩更新、4 次自动回退。
+- 1e-4：本受测拓扑与 1e-6 结果相同；这只表明在本组参数里更严格下界没有额外效果。
+
+该消融说明**防止非物理数值分支跳转优先于尽量避免所有完整求逆**。新增对应回归测试后，隔离 V8 执行 **67/67 测试逻辑通过**。过于宽松的下界仅供研究性消融复现，不能当作推荐设置。
+
+复现：`node scripts/rank-one-guard-ablation.mjs > guard_ablation.csv`。
+
+## 7. 后续正式投稿前的检验
 
 1. 真实 Node.js 工程 `npm ci && npm test && npm run lint && npm run build`，执行同平台多轮计时，提供 CPU/Node 版本和方差。
 2. 从小矩阵扩展到更大网络、密集切换、含环路的浮置节点病态案例；补完整正交参数扫。
