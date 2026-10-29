@@ -18,13 +18,18 @@ const validCount = (n, max = 64) =>
  * Independent R-diode-(C || R) branches driven by the same AC source.
  * Exactly one diode in each branch; multiple transitions may occur
  * during the same nominal BE step. Matrix dimension is 2*count + 2.
+ * The opt-in heavy-load profile produces repeated ON/OFF transitions
+ * under a shared AC drive, whereas light-load branches may stay ON.
+ * These are numerical PWL stress fixtures, NOT physical diode claims.
  */
 export function makeParallelDiodeBank(count, {
   frequency = 50,
   peakVoltage = 8,
+  loadProfile = 'light',
 } = {}) {
   if (!validCount(count) || !Number.isFinite(frequency) || frequency <= 0 ||
-      !Number.isFinite(peakVoltage) || peakVoltage <= 0) {
+      !Number.isFinite(peakVoltage) || peakVoltage <= 0 ||
+      !['light','heavy'].includes(loadProfile)) {
     throw new Error('无效的多二极管研究电路参数');
   }
   const elements = [
@@ -36,12 +41,12 @@ export function makeParallelDiodeBank(count, {
     const a = fixturePoint(80, 80 + 40 * i);
     const b = fixturePoint(160, 80 + 40 * i);
     elements.push({ id: 'feed'+i, type: 'resistor', p1: SOURCE_POS, p2: a,
-      value: 100 + (i % 3) * 80 });
+      value: loadProfile === 'heavy' ? 2 + 0.5*(i % 3) : 100 + (i % 3) * 80 });
     elements.push({ id: 'diode'+i, type: 'diode', p1: a, p2: b });
     elements.push({ id: 'load'+i, type: 'resistor', p1: b, p2: GROUND,
-      value: 1000 + (i % 5) * 200 });
+      value: loadProfile === 'heavy' ? 2 + 0.25*(i % 5) : 1000 + (i % 5) * 200 });
     elements.push({ id: 'cap'+i, type: 'capacitor', p1: b, p2: GROUND,
-      value: 1e-6 + (i % 4) * 0.5e-6 });
+      value: loadProfile === 'heavy' ? 1e-8 : 1e-6 + (i % 4) * 0.5e-6 });
   }
   elements.push({ id: 'probe', type: 'terminal', name: 'VOUT', p1: fixturePoint(160, 80) });
   return elements;
