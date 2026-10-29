@@ -1,0 +1,64 @@
+{
+  "title": "Round 9 independent multi-topology PWL MNA numerical audit",
+  "date": "2026-10-30",
+  "repository": "xiaowei2025cqu23phy/circuit-simulator",
+  "branch": "research/hsp-mna-local-validation",
+  "sourceCommitBeforeManifest": "8dcdb0de622d1a44496c732c37b750b7afa927b0",
+  "sourceBlobs": {
+    "src/sim/engine.js": "281f9e675f84d3440361c8a0c6efcad225f40001",
+    "src/sim/statePrediction.js": "b85c0f07948d179dc27972e285d71e4b7e9d3404",
+    "src/sim/linearSolve.js": "e5f1ba67f4a23da02963ff11658ca068affb743b",
+    "src/sim/rankOneUpdate.js": "1284e67ead232a48f635460fe1f2a9def21c49ac",
+    "src/sim/researchCircuits.js": "f9a937c2268f76ca99081bf8c51d2092246b491a",
+    "src/sim/mnaResidual.js": "0b117c9b1971cda073133d28a1f710458e5cd793",
+    "src/sim/multiTopology.test.mjs": "9ea50e5c151e85ff755a955a3faecda99d1e2ee6",
+    "scripts/benchmark-multi-topology.mjs": "707028297e6851d8b937ee19cb4b5b23876e306d",
+    "scripts/inspect-pwl-current-direction.mjs": "eed763e3e57926ecc27748c2d36af576fd358aed",
+    "research/round9-multitopology-v8-parity.csv": "2fa5b43decd05b79445e9f381ee4ab2c2463b372",
+    "research/round9-pwl-reverse-current-v8.csv": "8d2450b71bd50588c923c3b6ada9fce7c6791729"
+  },
+  "electricalProtocol": {
+    "PWL": "hysteretic-corrected (0.70V ON, 0.65V OFF)",
+    "linearSolvers": [
+      "inverse",
+      "lu",
+      "inverse-rank1"
+    ],
+    "sourceSampling": "be-end",
+    "dtSeconds": 0.00005,
+    "durationSeconds": 0.04,
+    "steps": 800,
+    "cases": 15,
+    "caseSolverPairs": 45
+  },
+  "evidenceStatus": {
+    "isolatedV8Tests": {
+      "passed": 74,
+      "total": 74,
+      "execution": "Actual GitHub JS source combined for synchronous assertions in a V8 isolate; ES module linkage and npm package scripts not tested in this pass"
+    },
+    "isolatedV8NumericalPairs": 45,
+    "nativeNodeOldCommit": {
+      "commit": "5f260bfdb8bb502ec5f9b437db08dbcb7bc8fe20",
+      "testsPassed": 67,
+      "total": 67
+    },
+    "nativeNodeNewCommit": "NOT RUN AFTER NEW COMMITS",
+    "ngspice": "NOT RUN",
+    "wallTimeBenchmarksForNewMultiTopology": "NOT RUN"
+  },
+  "numericalData": {
+    "mixedUnknownMaxAbsDifference": 1.467268e-11,
+    "probedVoltageMaxAbsDifferenceV": 8.05577827e-13,
+    "mixedRawMnaResidualMaxAbs": 2.28226327e-11,
+    "warning": "MNA unknown and residual vectors contain mixed voltage and current units; no universal voltage dimension"
+  },
+  "nativeReproduction": [
+    "npm ci",
+    "npm test",
+    "npm run lint",
+    "npm run build",
+    "npm run benchmark:hsp:topologies > research/round9-multitopology-node.csv",
+    "node scripts/inspect-pwl-current-direction.mjs > research/round9-pwl-reverse-current-node.csv"
+  ]
+}
