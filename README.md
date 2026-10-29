@@ -390,3 +390,20 @@ npm run benchmark:hsp:adaptive > adaptive_sensitivity.csv
 ```
 
 运行限制：本轮读取仓库实际 JavaScript 源码，在隔离 V8 中执行测试逻辑，**37/37 通过**；但受本地仓库不可克隆及 Actions 账单因素影响，尚未完整执行 Node npm、lint 或构建。并未运行 ngspice。详见 [第四轮报告](docs/adaptive-study.md) 和 [四模式结果 CSV](research/engine_four_mode_v8_results.csv)。实验性分支未经合并，勿称为稳定发行版。
+
+
+### 第五轮：稠密 LU 复用与定时事件对齐（非默认实验接口）
+
+`compileCircuit(elements, dt, { linearSolver: 'lu' })` 可选用部分主元稠密 LU 分解取代显式逆矩阵。系数矩阵不变时重用分解；二极管 PWL 状态、定时开关状态或动态元件步长改变时重新分解。默认仍为 `linearSolver: 'inverse'`，不会影响既有 UI。
+
+`stepEngineAtScheduledEvents(engine, probeId)` 可选用已知定时开关的 `timeOn/timeOff` 边界截断当前后向欧拉时间步。**它不执行未知二极管状态事件的精确零点定位**，也未修复全局时间采样约定。
+
+```bash
+npm test
+npm run benchmark:hsp:lu > lu_benchmark.csv
+python3 research/physical_diode_dc.py > physical_diode_dc.csv
+```
+
+实际 JavaScript 源码在隔离 V8 中通过 **45/45** 项测试。4 类电路 × 5 种状态策略共 20 组、每组 4,000 步，LU 与逆矩阵的最大节点电压差约 `1.96e-10 V`，未实测真实机器加速比。直流 Shockley 方程参照与 PWL 模型差异属于**模型近似误差**，不是两种线性后端的数值差异。
+
+参见 [第五轮研究记录](docs/fifth-round-lu-and-events.md)、[完整配对 CSV](research/lu_inverse_parity_v8.csv)。GitHub Actions 受账单限制，尚未完成正常 npm/lint/build 全流程验证；本研究 PR 保持 Draft。
