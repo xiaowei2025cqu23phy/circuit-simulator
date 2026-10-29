@@ -356,18 +356,21 @@ npm test
 
 ## 🔬 HSP-MNA 研究模式（独立分支）
 
-研究分支 `research/hsp-mna-validation` 增加了**可选**的双阈值历史预测模式；默认仍是现有的二极管步内校正迭代器。
+研究分支 `research/hsp-mna-validation` 增加了**可选**的三种基于相同双阈值状态机的实验模式；默认仍是现有的二极管步内校正迭代器。
 
 ```js
 const baseline = compileCircuit(elements, dt); // 默认：步内二极管状态校正
-const experimental = compileCircuit(elements, dt, { diodeSolver: 'predicted' }); // 历史预测，每步一次线性求解
-stepEngine(experimental);
-console.log(experimental.diagnostics);
+const predicted = compileCircuit(elements, dt, { diodeSolver: 'predicted' });
+const guarded = compileCircuit(elements, dt, { diodeSolver: 'guarded', correctionGuard: 0.015 });
+const corrected = compileCircuit(elements, dt, { diodeSolver: 'hysteretic-corrected' });
+stepEngine(guarded);
+console.log(guarded.diagnostics);
 ```
 
 - 双阈值预测为 0.70 V（由 OFF 转 ON）与 0.65 V（由 ON 转 OFF），使用上一时间步**已接受的节点解**决定本步离散状态；这与真实二极管物理模型不等价。
-- `engine.diagnostics` 记录求解次数、矩阵重构次数、未解决的状态迭代次数以及预测态的不一致计数。
-- 研究用对照脚本：`node scripts/compare-hsp-mna.mjs > comparison.csv`。
+- `engine.diagnostics` 记录求解次数、矩阵重构次数、端点状态校正次数、未解决的状态迭代次数及状态不一致计数。
+- **公平的三模式研究比较**：`npm run benchmark:hsp > comparison.csv`，采用相同双阈值状态机和 1 μs 同模型细步长参考波形。
+- **研究结果与失效例**：[三模式对照及续流失效分析](docs/three-mode-benchmark.md)；[实验 CSV](research/engine_three_mode_v8_results.csv)。原始工程基线的反向电流关断策略不同，不参与同模型精度优劣结论。
 - 电路仍只有二极管和手动/定时开关；论文中 BJT/MOSFET 的表达目前属于**模型设计与理论推导**，不是当前 JavaScript 引擎中已实现的器件。
 - 研究模式的误差与计算收益必须用同一器件模型及时间网格进行对照验证；不应从单次求解特性直接宣称实际速度提升。由于 GitHub Actions 账户配额限制，CI 运行状态并不代表代码测试结果，请本地执行 `npm test`、`npm run lint`、`npm run build`。
 
