@@ -54,9 +54,11 @@ test('four circuit examples preserve output using opt-in inverse-rank1 solver', 
       assert.ok(max<1e-6,`${key},${solver}: max difference=${max}`);
       assert.equal(old.diagnostics.linearSolves,rank.diagnostics.linearSolves);
       assert.ok(rank.diagnostics.factorizations<=old.diagnostics.factorizations);
-      assert.equal(rank.diagnostics.rankOneUpdates+rank.diagnostics.factorizations-1,
-        rank.diagnostics.matrixRebuilds,
-        'every matrix change should be either a successful rank update or full inversion');
+      assert.ok(rank.diagnostics.matrixRebuilds>=rank.diagnostics.factorizations-1,
+        'every full inversion after initialization is also a matrix rebuild');
+      assert.ok(rank.diagnostics.matrixRebuilds<=
+        rank.diagnostics.rankOneUpdates+rank.diagnostics.factorizations-1,
+        'one matrix rebuild can contain multiple diode rank-one updates');
     }
   }
 });
