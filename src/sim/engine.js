@@ -244,6 +244,8 @@ function segIntersect(a1, a2, b1, b2) {
 export function compileCircuit(els, dt = DEFAULT_DT, options = {}) {
   const diodeSolver = options.diodeSolver ?? 'iterative';
   const linearSolver = options.linearSolver ?? 'inverse';
+  const sourceSampling = options.sourceSampling ?? 'legacy-start';
+  if (!['legacy-start', 'be-end'].includes(sourceSampling)) throw new Error('未知源信号采样约定');
   if (!['inverse', 'lu'].includes(linearSolver)) throw new Error('未知线性求解模式');
   if (!['iterative', 'predicted', 'guarded', 'hysteretic-corrected', 'adaptive'].includes(diodeSolver)) throw new Error('未知二极管求解模式');
   const correctionGuard = options.correctionGuard ?? 0.015;
@@ -381,7 +383,7 @@ export function compileCircuit(els, dt = DEFAULT_DT, options = {}) {
   const engineEls = els.map(e => ({ ...e }));
 
   return {
-    dt, nominalDt: dt, eventAwareTime: false, t: 0, size, N, M, A_inv, luFactors, linearSolver, validEls, branchEls, branchMap, dsu, nodeMap, finalGroundRoot,
+    dt, nominalDt: dt, eventAwareTime: false, sourceSampling, t: 0, size, N, M, A_inv, luFactors, linearSolver, validEls, branchEls, branchMap, dsu, nodeMap, finalGroundRoot,
     state: {}, history: [], currentNodes: {}, allEls: engineEls, switchStates,
     needsMatrixRebuild: false, lastMeasured: null, lastUiTime: 0,
     diodeSolver, correctionGuard, adaptiveScale, previousSolution: null,
@@ -394,13 +396,16 @@ export function compileCircuit(els, dt = DEFAULT_DT, options = {}) {
 // ---------- 单步瞬态求解 ----------
 export function stepEngine(eng, probeId = null) {
   const { dt, size, validEls, branchMap, state, switchStates } = eng;
+  // Standard backward Euler samples prescribed sources at the NEW endpoint.
+  // Preserve the legacy UI's start-of-step behavior unless explicitly enabled.
+  const sampleTime = eng.sourceSampling === 'be-end' ? eng.t + dt : eng.t;
 
   // 1) 更新定时开关状态（与电压无关，提前生效避免一步延迟）
   validEls.forEach(el => {
     if (el.type === 'switch' && el.control === 'time') {
-      const shouldBeON = eng.eventAwareTime
-        ? (eng.t >= (el.timeOn || 0) && eng.t < (el.timeOff || 0))
-        : (eng.t >= (el.timeOn || 0) && eng.t <= (el.timeOff || 0));
+      const shouldBeON = (eng.eventAwareTime || eng.sourceSampling === 'be-end')
+        ? (sampleTime >= (el.timeOn || 0) && sampleTime < (el.timeOff || 0))
+        : (sampleTime >= (el.timeOn || 0) && sampleTime <= (el.timeOff || 0));
       if (switchStates[el.id] !== shouldBeON) { switchStates[el.id] = shouldBeON; eng.needsMatrixRebuild = true; }
     }
   });
@@ -433,9 +438,9 @@ export function stepEngine(eng, probeId = null) {
         if (n2 >= 0) b[n2] -= Ieq;
       }
       else if (type === 'inductor') b[branchMap[id]] = -((Number(value) || 1e-3) / dt) * (state[id] || 0);
-      else if (type === 'voltage') b[branchMap[id]] = getSourceValue(el, eng.t);
+      else if (type === 'voltage') b[branchMap[id]] = getSourceValue(el, sampleTime);
       else if (type === 'current') {
-        const isrc = getSourceValue(el, eng.t);
+        const isrc = getSourceValue(el, sampleTime);
         if (n1 >= 0) b[n1] -= isrc;
         if (n2 >= 0) b[n2] += isrc;
       }
@@ -549,7 +554,7 @@ export function stepEngine(eng, probeId = null) {
     else if (type === 'inductor') { i_elem = x[branchMap[id]]; state[id] = i_elem; }
     else if (type === 'voltage') i_elem = x[branchMap[id]];
     else if (type === 'resistor') i_elem = v_elem / (Number(value) || 1e-3);
-    else if (type === 'current') i_elem = getSourceValue(el, eng.t);
+    else if (type === 'current') i_elem = getSourceValue(el, sampleTime);
     else if (type === 'diode' || type === 'switch') {
       const g = switchStates[id] ? 1.0 / (type === 'switch' ? 0.01 : 0.05) : 1e-8;
       i_elem = v_elem * g;
@@ -584,8 +589,8 @@ export function stepEngine(eng, probeId = null) {
 
   // 6) 波形历史（按点数上限截断，块式清理避免频繁大数组操作）
   if (probeId) {
-    eng.history.push({ t: eng.t, v: measuredV, i: measuredI });
-    eng.lastMeasured = { t: eng.t, v: measuredV, i: measuredI };
+    eng.history.push({ t: sampleTime, v: measuredV, i: measuredI });
+    eng.lastMeasured = { t: sampleTime, v: measuredV, i: measuredI };
     if (eng.history.length >= HISTORY_MAX + 1000) eng.history.splice(0, eng.history.length - HISTORY_MAX);
   } else if (eng.history.length) {
     eng.history = [];
