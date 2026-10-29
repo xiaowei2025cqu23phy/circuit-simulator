@@ -62,3 +62,33 @@ export function endpointDiodeUpdates(validEls, switchStates, solution, guard = 0
   }
   return updates;
 }
+
+
+/**
+ * Adaptive endpoint guard based on the *measured* maximum diode-voltage jump.
+ * gamma = gammaMax / (1 + max_j |vD_now - vD_prev| / scale).
+ *
+ * This is a heuristic safeguard, NOT an a-posteriori error bound. It tightens
+ * the allowed endpoint-state violation during fast transitions and tends to
+ * the fixed guard for slow transitions. The first step uses zero guard.
+ */
+export function adaptiveDiodeGuard(validEls, previousSolution, currentSolution, {
+  maxGuard = 0.015,
+  scale = 0.2,
+} = {}) {
+  if (!Number.isFinite(maxGuard) || maxGuard < 0) throw new Error('自适应最大容差必须非负');
+  if (!Number.isFinite(scale) || scale <= 0) throw new Error('自适应电压尺度必须大于零');
+  if (!previousSolution) return 0;
+  let maxJump = 0;
+  for (const el of validEls) {
+    if (el.type !== 'diode') continue;
+    const vNow = (el.n1 >= 0 ? currentSolution[el.n1] : 0)
+      - (el.n2 >= 0 ? currentSolution[el.n2] : 0);
+    const vPrevious = (el.n1 >= 0 ? previousSolution[el.n1] : 0)
+      - (el.n2 >= 0 ? previousSolution[el.n2] : 0);
+    const jump = Math.abs(vNow - vPrevious);
+    if (!Number.isFinite(jump)) return 0;
+    maxJump = Math.max(maxJump, jump);
+  }
+  return maxGuard / (1 + maxJump / scale);
+}
