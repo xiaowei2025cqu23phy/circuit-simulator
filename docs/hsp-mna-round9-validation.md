@@ -15,16 +15,16 @@
 - 系统可见内存约 15.98 GiB；检查时可用约 1.42 GiB（动态值）。
 - 分支起始 commit：`07a54b1`，工作区起始干净；远程 `origin/research/hsp-mna-validation` fetch 到该分支最新提交。
 - `package.json` 声明使用 Node 测试运行器 `node --test src/sim/*.test.mjs`，Vite 8 构建。
-- `npm ci` 安装 244 个包；npm 报告 11 项审计告警（1 low、2 moderate、8 high）。本轮未运行自动依赖升级，以免无范围评估地改变依赖。
+- 操作者报告 `npm ci` 安装 244 个包，npm 报告 11 项审计告警（1 low、2 moderate、8 high）；但本 PR **未附独立存档的 npm-ci 标准输出和退出码日志**，当前不能仅凭报告将该步骤归类为有完整日志佐证。本轮未自动升级依赖。
 - ngspice：未安装/未找到。外部 SPICE 未验证。
 
 ## 2. 工程测试
 
 | 命令 | 实际结果 |
 |---|---|
-| `npm ci` | 通过；244 packages；11 audit advisories |
+| `npm ci` | 操作者报告通过；244 packages、11 audit advisories；缺安装 stdout/退出码独立日志 |
 | 初次 `npm test` | 65/67；2 项 `ReferenceError: ptToStr is not defined` |
-| 修复后 `npm test` | 67/67 通过，Node 原生测试运行器，约 4.9 秒 |
+| 修复后 `npm test` | 67/67 通过，Node 原生测试运行器；存档日志总耗时 6476.89 ms（约 6.48 秒） |
 | `npm run lint` | 通过 |
 | `npm run build` | 通过；Vite 8.0.9，1728 modules，JS gzip 87.39 kB |
 | `npm run benchmark:hsp` | 通过 |
@@ -53,7 +53,7 @@
 `benchmark:hsp:lu` 和 `benchmark:hsp:rank1` 均对半波整流、全波桥、二极管限幅、续流四个预置电路运行 4000 步、40 ms、dt=10 µs，并覆盖迭代、预测、固定 guard、自适应、端点迟滞校正。BE 终点源采样用于研究比较。
 
 - LU 对完整逆的节点电压差：各电路/模式通常为 1e-13 V 量级；续流历史预测模式最大约 1.97e-10 V。所有记录的 unresolved steps 为 0。
-- 秩一逆与完整逆大多在约 1e-11 V 内；桥式整流观测到约 2.84e-8 V 最大电压差，同时出现 8 次安全回退（相对 9 次全逆分解为 5 次完整分解、8 次秩一更新、4 次回退）。这证实回退路径对该案例有实际作用；不能据此声称无条件精确等价。
+- 秩一逆与完整逆大多在约 1e-11 V 内；桥式整流观测到约 2.84e-8 V 最大电压差，成功完成 8 次秩一更新且发生 4 次安全回退（相对基准 9 次完整求逆，秩一方案为 5 次完整求逆）。这证实回退路径对该案例有实际作用；不能据此声称无条件精确等价。
 - `benchmark:hsp` 同模型细网格参考是 hysteretic-corrected PWL、dt=1 µs、BE 终点源采样，并非物理真值。预测模式的误差在续流案例严重：dt=10 µs RMSE 118.46 V、最大误差 7492.14 V；端点校正对应 RMSE 7.05e-9 V、最大误差 1.68e-8 V。freewheel 预置电路测试同样专门暴露预测模式尖峰，不能把一步预测当作可靠精度解。
 - 同 PWL law 的端点校正对本实验参考解表现最佳，但 1 µs 参考仍是数值参考，并非 Shockley/SPICE 或实物基准。
 
@@ -133,3 +133,9 @@ npm run benchmark:hsp:secant
 ---
 
 [![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
+
+## 9. 独立代码复核补充（2026-10-30）
+
+- 已将测试文件中的重复坐标键工具函数改为从引擎 `engine.js` 直接导入 `ptToStr`，防止测试副本与生产函数未来漂移；**该后续改动尚没有新的完整 Node npm test/lint/build 日志**，原有存档 67/67 日志对应修复前的第九轮验证提交，不应写成新提交已通过。
+- 已更正桥式整流 rank-one 计数（成功秩一更新 8 次、自动安全回退 4 次），以及完整测试日志的总耗时。
+- 此次独立 GitHub 审查可交叉核对 PR diff 和 CSV，但不能代替在用户本机执行 Node 环境命令。请在本地新提交 HEAD 再运行完整命令并保存日志。
