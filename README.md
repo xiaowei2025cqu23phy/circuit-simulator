@@ -467,3 +467,22 @@ node scripts/rank-one-guard-ablation.mjs > guard_ablation.csv
 - 同一合成网络中三法残差最大约 1e−14；真正病态的桥式整流例应沿用第七轮的数值分母保护回退。
 
 复现脚本：**scripts/benchmark-mna-scaling.mjs**，命令 **npm run benchmark:hsp:scale**。详见 [第八轮方法与限制](docs/eighth-round-node-benchmark.md)、[原生 Node 数据](research/node22_mna_scaling_results.csv)、[右端数量敏感性表](research/node22_mna_rhs_sensitivity.csv)。真实系统全量 npm/test/lint/build 与 ngspice 物理对照仍待完成；本研究 PR 为 Draft，不合并 main。
+
+
+## 第九轮后续：多拓扑 MNA 与物理模型边界（验证分支）
+
+本节仅属于 research/hsp-mna-local-validation 验证分支及 Draft PR #2，不会更改 main 默认行为。新增的研究电路构造、线性残量检查及 benchmark 直接使用 compileCircuit / stepEngine：
+
+- src/sim/researchCircuits.js：轻/重负载并联 4/12/24 二极管网络，以及 4/8/16 级 RC/RL/RLC 网络。
+- src/sim/mnaResidual.js：根据**求解前**电容电压与电感电流重建已接受 BE MNA 方程，检查真实全系统残量，而不只是对照两个求解器的终端波形。
+- src/sim/multiTopology.test.mjs：新增七项多二极管/电容/电感/定时开关缓存与回归测试。
+- scripts/benchmark-multi-topology.mjs：真正的 Node.js 全瞬态内核计时，可运行 npm run benchmark:hsp:topologies。
+- scripts/inspect-pwl-current-direction.mjs：审查迟滞 PWL 宏模型中 ON 支路反向电流，避免用状态一致性误称物理二极管精度。
+
+**初步执行证据：** 74/74 项测试逻辑通过隔离 V8 执行，新增 15 拓扑×3 后端共 45 行数值对照。在这些有限算例中，全 MNA 代数未知量最大差约 1.47e−11（电压和支路电流混合单位），最大原始逐行 MNA 残量约 2.28e−11（KCL/KVL 混合量纲），24 个二极管可同一步切换。重负载版本会在 40 ms 内反复 ON/OFF。
+
+**关键负结果：** 当前人为设定的 0.70/0.65 V 迟滞区，在 ON 状态允许最多约 −1 A 的反向电流：stateDisagreements=0 并不代表物理二极管单向导通条件成立。该数值宏模型需要独立的物理精度研究，不得视为真实 SPICE 二极管。
+
+原始数值数据：research/round9-multitopology-v8-parity.csv、research/round9-pwl-reverse-current-v8.csv；版本证明：research/round9-multitopology-manifest.json；详细报告：docs/hsp-mna-round9-multitopology-followup.md。
+
+**重要：** 新增改动还没有新的原生 Windows/Node npm test/lint/build 日志及 benchmark wall-clock 测量；之前的 67/67 原生 Node 通过日志只对应旧 commit。需要让本机验证者重跑，不得将 74/74 V8 写成 74/74 原生 npm 已通过。
