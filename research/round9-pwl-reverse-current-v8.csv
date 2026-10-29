@@ -1,0 +1,5 @@
+# Actual research JS executed in isolated V8, 2026-10-30. Not external physics reference.
+# ON diode affine current i=g_on*(vD-0.7); negative currents are a MODEL consistency limitation.
+load_profile,diodes,nominal_steps,on_state_samples,negative_on_state_samples,min_on_state_current_a,total_diode_transitions,state_disagreements,unresolved_steps
+light,4,800,3180,1670,-0.00827120888477,4,0,0
+heavy,4,800,1832,320,-0.994242826234,16,0,0
