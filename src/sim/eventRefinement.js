@@ -59,6 +59,7 @@ function restoreEngine(e, s) {
  *   eventRejectedTrials = number of rolled-back trial segments
  *   eventAcceptedSubsteps = accepted segments smaller than nominalDt
  *   eventDepthLimitHits = transitions accepted at the recursion limit
+ *   eventLastBracket* = final accepted switching subinterval (not an exact root)
  *
  * Event detection is based on a CHANGE in a committed trial's diode state,
  * and therefore depends on the finite-state PWL approximation.
@@ -80,7 +81,8 @@ export function stepEngineWithDiodeRefinement(eng, probeId = null, {
   }
   const diodeIds = eng.validEls.filter(el => el.type === 'diode').map(el => el.id);
   const required = ['eventRejectedSolves', 'eventRejectedFactorizations',
-    'eventRejectedTrials', 'eventAcceptedSubsteps', 'eventDepthLimitHits'];
+    'eventRejectedTrials', 'eventAcceptedSubsteps', 'eventDepthLimitHits',
+    'eventTransitionCount'];
   for (const key of required) {
     if (!Number.isFinite(eng.diagnostics[key])) eng.diagnostics[key] = 0;
   }
@@ -90,6 +92,7 @@ export function stepEngineWithDiodeRefinement(eng, probeId = null, {
   function runSegment(h, depth) {
     const start = snapshotEngine(eng);
     const originalStates = diodeIds.map(id => Boolean(eng.switchStates[id]));
+    const hasInitialHistory = start.previousSolution !== null;
     if (eng.dt !== h) {
       eng.dt = h;
       eng.needsMatrixRebuild = true;
@@ -101,7 +104,9 @@ export function stepEngineWithDiodeRefinement(eng, probeId = null, {
       throw err;
     }
     const switched = diodeIds.some((id, index) => Boolean(eng.switchStates[id]) !== originalStates[index]);
-    if (switched && depth < maxHalvings) {
+    // A first-step DC state initialization has no bracketed interior event.
+    // Do not shrink it repeatedly just to choose its initial state.
+    if (switched && hasInitialHistory && depth < maxHalvings) {
       const discardedSolves = eng.diagnostics.linearSolves - start.diagnostics.linearSolves;
       const discardedFactors = eng.diagnostics.factorizations - start.diagnostics.factorizations;
       restoreEngine(eng, start);
@@ -113,7 +118,13 @@ export function stepEngineWithDiodeRefinement(eng, probeId = null, {
     } else {
       accepted += 1;
       if (depth > 0) eng.diagnostics.eventAcceptedSubsteps += 1;
-      if (switched && depth >= maxHalvings) eng.diagnostics.eventDepthLimitHits += 1;
+      if (switched && hasInitialHistory) {
+        eng.diagnostics.eventTransitionCount += 1;
+        eng.diagnostics.eventLastBracketStart = start.t;
+        eng.diagnostics.eventLastBracketEnd = eng.t;
+        eng.diagnostics.eventLastBracketWidth = h;
+        if (depth >= maxHalvings) eng.diagnostics.eventDepthLimitHits += 1;
+      }
     }
   }
 
