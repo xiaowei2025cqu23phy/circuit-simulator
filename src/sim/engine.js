@@ -16,6 +16,7 @@ export const GMIN = 1e-12;          // 对地弱电导（不保证任意 MNA 系
 export const DEFAULT_DT = 1e-5;     // 默认仿真步长 10µs
 export const HISTORY_MAX = 250000;  // 波形历史最大点数
 import { predictDiodeStates, countDiodeStateDisagreements, endpointDiodeUpdates, adaptiveDiodeGuard } from './statePrediction.js';
+import { factorizeLU, solveLU } from './linearSolve.js';
 
 // ---------- 并查集：导线/标签/接地节点合并 ----------
 export class DSU {
@@ -242,6 +243,8 @@ function segIntersect(a1, a2, b1, b2) {
 
 export function compileCircuit(els, dt = DEFAULT_DT, options = {}) {
   const diodeSolver = options.diodeSolver ?? 'iterative';
+  const linearSolver = options.linearSolver ?? 'inverse';
+  if (!['inverse', 'lu'].includes(linearSolver)) throw new Error('未知线性求解模式');
   if (!['iterative', 'predicted', 'guarded', 'hysteretic-corrected', 'adaptive'].includes(diodeSolver)) throw new Error('未知二极管求解模式');
   const correctionGuard = options.correctionGuard ?? 0.015;
   if (!Number.isFinite(correctionGuard) || correctionGuard < 0) throw new Error('校正容差必须为非负有限数');
@@ -369,20 +372,22 @@ export function compileCircuit(els, dt = DEFAULT_DT, options = {}) {
   });
 
   const A = buildMNA(N, M, dt, validEls, branchEls, switchStates);
-  const A_inv = invertMatrix(A);
-  if (!A_inv) throw new Error('电路拓扑存在悬空节点或非法连接（无法求解），请检查电路是否完整。');
+  const A_inv = linearSolver === 'inverse' ? invertMatrix(A) : null;
+  const luFactors = linearSolver === 'lu' ? factorizeLU(A) : null;
+  if (!(A_inv || luFactors)) throw new Error('电路拓扑存在悬空节点或非法连接（无法求解），请检查电路是否完整。');
 
   const branchMap = {};
   branchEls.forEach((el, idx) => { branchMap[el.id] = N + idx; });
   const engineEls = els.map(e => ({ ...e }));
 
   return {
-    dt, t: 0, size, N, M, A_inv, validEls, branchEls, branchMap, dsu, nodeMap, finalGroundRoot,
+    dt, t: 0, size, N, M, A_inv, luFactors, linearSolver, validEls, branchEls, branchMap, dsu, nodeMap, finalGroundRoot,
     state: {}, history: [], currentNodes: {}, allEls: engineEls, switchStates,
     needsMatrixRebuild: false, lastMeasured: null, lastUiTime: 0,
     diodeSolver, correctionGuard, adaptiveScale, previousSolution: null,
     diagnostics: { steps: 0, linearSolves: 0, matrixRebuilds: 0, stateDisagreements: 0, unresolvedSteps: 0,
-      stateCorrections: 0, stepsWithCorrections: 0, adaptiveTightenedSteps: 0 },
+      stateCorrections: 0, stepsWithCorrections: 0, adaptiveTightenedSteps: 0,
+      factorizations: 1 },
   };
 }
 
@@ -404,10 +409,17 @@ export function stepEngine(eng, probeId = null) {
   const assembleAndSolve = () => {
     if (eng.needsMatrixRebuild) {
       const A_new = buildMNA(eng.N, eng.M, dt, validEls, eng.branchEls, switchStates);
-      const inv = invertMatrix(A_new);
-      if (!inv) throw new Error('状态切换后 MNA 矩阵不可逆，已停止仿真');
-      eng.A_inv = inv;
+      if (eng.linearSolver === 'lu') {
+        const factors = factorizeLU(A_new);
+        if (!factors) throw new Error('状态切换后 MNA 矩阵无法 LU 分解');
+        eng.luFactors = factors;
+      } else {
+        const inv = invertMatrix(A_new);
+        if (!inv) throw new Error('状态切换后 MNA 矩阵不可逆，已停止仿真');
+        eng.A_inv = inv;
+      }
       eng.diagnostics.matrixRebuilds += 1;
+      eng.diagnostics.factorizations += 1;
       eng.needsMatrixRebuild = false;
     }
     const b = Array(size).fill(0);
@@ -431,12 +443,17 @@ export function stepEngine(eng, probeId = null) {
         if (n2 >= 0) b[n2] -= ieq;
       }
     });
-    // 求解 x = A_inv · b
-    const x = Array(size).fill(0);
-    for (let i = 0; i < size; i++) {
-      let sum = 0;
-      for (let j = 0; j < size; j++) sum += eng.A_inv[i][j] * b[j];
-      x[i] = sum;
+    // Reuse whichever matrix factorization belongs to the current PWL state.
+    let x;
+    if (eng.linearSolver === 'lu') {
+      x = solveLU(eng.luFactors, b);
+    } else {
+      x = Array(size).fill(0);
+      for (let i = 0; i < size; i++) {
+        let sum = 0;
+        for (let j = 0; j < size; j++) sum += eng.A_inv[i][j] * b[j];
+        x[i] = sum;
+      }
     }
     eng.diagnostics.linearSolves += 1;
     return x;
