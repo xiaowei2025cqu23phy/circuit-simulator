@@ -249,6 +249,9 @@ export function compileCircuit(els, dt = DEFAULT_DT, options = {}) {
   if (!['legacy-start', 'be-end'].includes(sourceSampling)) throw new Error('未知源信号采样约定');
   if (!['inverse', 'lu', 'inverse-rank1'].includes(linearSolver)) throw new Error('未知线性求解模式');
   const maxRankOneUpdates = options.maxRankOneUpdates ?? 32;
+  const rankOneDenominatorFloor = options.rankOneDenominatorFloor ?? 1e-6;
+  if (!Number.isFinite(rankOneDenominatorFloor) || rankOneDenominatorFloor <= 0 || rankOneDenominatorFloor > 0.1)
+    throw new Error('秩一分母相对下界无效');
   if (!Number.isInteger(maxRankOneUpdates) || maxRankOneUpdates < 1 || maxRankOneUpdates > 512)
     throw new Error('秩一更新次数上限应为 1 到 512 之间的整数');
   if (!['iterative', 'predicted', 'guarded', 'hysteretic-corrected', 'adaptive'].includes(diodeSolver)) throw new Error('未知二极管求解模式');
@@ -388,7 +391,8 @@ export function compileCircuit(els, dt = DEFAULT_DT, options = {}) {
 
   return {
     dt, nominalDt: dt, eventAwareTime: false, sourceSampling, t: 0, size, N, M, A_inv, luFactors, linearSolver, validEls, branchEls, branchMap, dsu, nodeMap, finalGroundRoot,
-    factorStates: { ...switchStates }, factorDt: dt, rankOneSinceFull: 0, maxRankOneUpdates,
+    factorStates: { ...switchStates }, factorDt: dt, rankOneSinceFull: 0,
+    maxRankOneUpdates, rankOneDenominatorFloor,
     state: {}, history: [], currentNodes: {}, allEls: engineEls, switchStates,
     needsMatrixRebuild: false, lastMeasured: null, lastUiTime: 0,
     diodeSolver, correctionGuard, adaptiveScale, previousSolution: null,
@@ -430,7 +434,8 @@ export function stepEngine(eng, probeId = null) {
           for (const el of changed) {
             const nextG = switchStates[el.id] ? 20 : 1e-8;
             const oldG = eng.factorStates[el.id] ? 20 : 1e-8;
-            nextInverse = updateInverseForConductanceBranch(nextInverse, el.n1, el.n2, nextG - oldG);
+            nextInverse = updateInverseForConductanceBranch(nextInverse, el.n1, el.n2, nextG - oldG,
+              { relativeDenominatorFloor: eng.rankOneDenominatorFloor });
             if (!nextInverse) break;
           }
           if (nextInverse) {
