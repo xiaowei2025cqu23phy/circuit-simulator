@@ -423,3 +423,34 @@ python3 research/physical_diode_dc.py > physical_diode_dc.csv
 - 复现：`npm run benchmark:hsp:event > events.csv`、`npm run benchmark:hsp > modes.csv`。
 
 这轮直接发现：10 μs 下，半波整流经过事件二分后 RMSE 从 **1.273 mV 增至 4.755 mV**，桥式整流从 **2.926 mV 增至 6.610 mV**，说明朴素二分的代价和误差可能双输；不应作为默认算法。ngspice 尚未运行，物理正确性仍待验证。
+
+
+## 第七轮（研究分支）：割线事件候选与低秩导纳更新
+
+研究接口（不会改变 `main` 或默认 UI）：
+
+```js
+const eng = compileCircuit(elements, 1e-5, {
+  diodeSolver:'hysteretic-corrected',
+  linearSolver:'inverse-rank1', // 可选，原默认依然是 inverse
+  sourceSampling:'be-end',      // 可选，原默认依然是 legacy-start
+});
+
+// 另一种实验：启用二极管割线事件试算（仅 hysteretic-corrected）
+const trial = compileCircuit(elements, 1e-5, {
+  diodeSolver:'hysteretic-corrected', linearSolver:'lu', sourceSampling:'be-end',
+});
+stepEngineWithEstimatedDiodeEvent(trial);
+```
+
+`stepEngineWithEstimatedDiodeEvent` 从 `src/sim/eventEstimate.js` 单独导入；估计来自冻结旧 PWL 状态下的电压端点插值，**不是精确事件根定位**。实验发现割线分步在若干算例中的 RMSE 不如直接端点校正，不能视为已证实的创新优势。
+
+`inverse-rank1` 使用已知的 Sherman-Morrison 公式为单个二极管导纳变化重用已有逆矩阵，并在病态分母、其他器件矩阵变化或最多 32 次累计更新后回退完整求逆。四个示例中的成功更新使完整求逆次数减少，但还**未**完成真实 Node.js 环境下的耗时加速测试。此策略仍是稠密逆矩阵方法，不是稀疏 LU。
+
+```bash
+npm test
+npm run benchmark:hsp:secant > secant.csv
+npm run benchmark:hsp:rank1 > rank_one.csv
+```
+
+最新实验和可核查限制见 [第七轮研究报告](docs/seventh-round-secants-rankone.md)、[48 组事件候选数据](research/event_secant_be_end_v8_results.csv) 与 [40 组低秩对照数据](research/rank_one_inverse_v8_results.csv)。隔离 V8 执行实际 JS 测试逻辑 **65/65 项通过**；但完整 npm/lint/build、设备计时与外部 ngspice 仍待验证。实验性改动保留在 Draft PR，不自动合并。
