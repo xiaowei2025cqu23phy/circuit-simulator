@@ -34,7 +34,7 @@ The independent script compares historical prediction and endpoint state correct
 ### Known limitations and follow-up
 
 - The default solver uses a 0.7 V turn-on threshold and a negative-conduction-current release test, while the experimental predictor uses a 0.70/0.65 V hysteretic voltage state machine. Therefore their differences reflect **both** state-selection policies and threshold policy; a strict apples-to-apples study should first standardize the switching law and handle the non-convergence near threshold.
-- Both modes currently reuse an explicit Gauss–Jordan inverse, not LU factorization; LU is a proposed improvement rather than a deployed fact.
+- The DEFAULT engine still uses a Gauss–Jordan inverse; the research branch now additionally implements opt-in partial-pivot **dense LU** with factorization reuse via `{linearSolver:'lu'}`. Sparse LU remains unimplemented.
 - The repository presently implements no BJT or NMOS device models. Planned device stamps in the paper must not be described as tested features.
 
 ### Three-mode engine comparison
