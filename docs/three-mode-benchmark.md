@@ -61,3 +61,13 @@ node scripts/compare-hsp-mna.mjs > three_mode_engine_benchmark.csv
 ```
 
 由于 benchmark 中耗时取三个重复的中位数，实际计时结果会随运行平台变化。若要比较速度应至少执行多轮独立试验、记录 CPU/Node 版本与测试条件，不宜将单次数字用于论文“加速比”结论。
+
+## 6. 投稿前必须比较的先行方法
+
+以下都是已有的公开研究，不能将“PWL、状态机或避免 Newton 迭代”单独视为无先例的发明：
+
+1. C. Visweswariah and R. A. Rohrer, “Piecewise Approximate Circuit Simulation,” *IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems*, 1991. [IBM 研究资料](https://research.ibm.com/publications/piecewise-approximate-circuit-simulation)。采用 PWL 器件模型和事件驱动仿真。
+2. M. K. Camlibel, W. P. M. H. Heemels, and J. M. Schumacher, “Consistency of a Time-Stepping Method for a Class of Piecewise-Linear Networks,” *IEEE Transactions on Circuits and Systems I*, vol. 49, no. 3, pp. 349–357, 2002, DOI: [10.1109/81.989170](https://doi.org/10.1109/81.989170)。已有对含理想二极管 PL 网络的时间步进一致性证明（在其给定条件下）。
+3. C. Reiman and E. Rosenbaum, “Numerical Methods for Event-Detection State Vector Simulation of Switched-Mode Power Supplies,” *IEEE Journal of Emerging and Selected Topics in Power Electronics*, vol. 8, pp. 2285–2292, 2020, DOI: [10.1109/JESTPE.2019.2946281](https://doi.org/10.1109/JESTPE.2019.2946281)。利用状态空间分解矩阵与切换时刻更新。
+
+论文目前的可辩护研究问题是：在**具体轻量级 MNA-PWL 实现中**，同一离散切换模型下，历史状态预测、容差触发端点校正与完全端点一致性校正之间存在哪些误差/计算次数权衡，如何识别并处理续流事件中的危险的一步滞后？本实验尚不构成相对于上述方法的理论首创证明。
