@@ -83,3 +83,41 @@ test('inverse-rank1 plus temporal rollback preserves cache coherence', () => {
   assert.equal(e.diagnostics.factorizations+e.diagnostics.rankOneUpdates-1,
     e.diagnostics.matrixRebuilds);
 });
+
+test('rank-one denominator floor option validates safety range',()=>{
+  assert.throws(()=>compileCircuit(PREDEFINED_CIRCUITS.rectifier.elements,1e-5,{
+    linearSolver:'inverse-rank1',rankOneDenominatorFloor:0,
+  }),/下界/);
+  assert.throws(()=>compileCircuit(PREDEFINED_CIRCUITS.rectifier.elements,1e-5,{
+    linearSolver:'inverse-rank1',rankOneDenominatorFloor:Infinity,
+  }),/下界/);
+  assert.equal(compileCircuit(PREDEFINED_CIRCUITS.rectifier.elements,1e-5,{
+    linearSolver:'inverse-rank1',
+  }).rankOneDenominatorFloor,1e-6);
+});
+
+test('unsafe bridge rank-one denominator can trigger false extra diode transitions',()=>{
+  const elements=PREDEFINED_CIRCUITS.fullwave_rect.elements,probe=ptToStr({x:500,y:180});
+  const exact=compileCircuit(elements,1e-5,{
+    diodeSolver:'guarded',linearSolver:'inverse',sourceSampling:'be-end',
+  });
+  const unsafe=compileCircuit(elements,1e-5,{
+    diodeSolver:'guarded',linearSolver:'inverse-rank1',sourceSampling:'be-end',
+    rankOneDenominatorFloor:1e-8,
+  });
+  const safe=compileCircuit(elements,1e-5,{
+    diodeSolver:'guarded',linearSolver:'inverse-rank1',sourceSampling:'be-end',
+    rankOneDenominatorFloor:1e-6,
+  });
+  let bad=0,good=0;
+  for(let i=0;i<4000;i++){
+    stepEngine(exact);stepEngine(unsafe);stepEngine(safe);
+    bad=Math.max(bad,Math.abs(exact.currentNodes[probe]-unsafe.currentNodes[probe]));
+    good=Math.max(good,Math.abs(exact.currentNodes[probe]-safe.currentNodes[probe]));
+  }
+  assert.ok(bad>1e-5,'dangerous denominator can accumulate significant error');
+  assert.ok(good<1e-6,'safe denominator fallback preserves matched PWL waveform');
+  assert.ok(unsafe.diagnostics.linearSolves>exact.diagnostics.linearSolves);
+  assert.equal(safe.diagnostics.linearSolves,exact.diagnostics.linearSolves);
+  assert.ok(safe.diagnostics.rankOneFallbacks>=1);
+});
