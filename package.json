@@ -10,7 +10,8 @@
     "test": "node --test src/sim/*.test.mjs",
     "preview": "vite preview",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist",
+    "benchmark:hsp": "node scripts/compare-hsp-mna.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.8.0",
