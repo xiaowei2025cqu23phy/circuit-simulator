@@ -153,3 +153,19 @@ node research/round8-evidence-snapshot/bench_workspace/scripts/benchmark-mna-sca
 ---
 
 [![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
+
+
+## 十、独立复核新增：物理二极管电流约束不能由迟滞状态一致性替代
+
+2026-10-30 的后续多拓扑实验发现一个需要在正式投稿中**明确披露**的模型边界：
+
+研究分支的 ON 支路是 i=20(v_D−0.70)，而只要 v_D≥0.65 V，就保持 ON。因此 ON 与 OFF 的 50mV 迟滞区允许最高约 1A 的反向 ON 支路电流。在同 PWL 模型数值实验中，四二极管轻负载网络的最小 ON 电流约 −8.271mA，重负载压力网络约 −0.994A；两者的状态诊断 stateDisagreements 均为 0。实际原始记录和可重跑程序见 research/round9-pwl-reverse-current-v8.csv 与 scripts/inspect-pwl-current-direction.mjs。
+
+这证明 **“端点状态机一致”不等于“二极管单向电流约束成立”**。这类 ON 状态反向电流是人为宏模型的允许行为，不能称为真实二极管反向恢复特性、Shockley 准确度或 SPICE 验证。已有论文结果如果讨论物理器件真实性，应新增独立非线性二极管或互补性模型对照，并明确可选的两阈值 PWL 宏模型属于数值教学近似。
+
+此项发现不否定先前同一个 PWL 方程下的 LU、inverse、inverse-rank1 数值求解一致性；它提醒读者区分三层验证：
+1. 线性方程与状态算法内部一致性；
+2. 相同 PWL 器件模型下不同步长的数值离散化误差；
+3. 与物理二极管、实测波形或独立 SPICE 模型的外部真实性。
+
+第三层尚未完成，不能因为第一层数值残量很小就视为第三层已证实。详见 docs/hsp-mna-round9-multitopology-followup.md。
