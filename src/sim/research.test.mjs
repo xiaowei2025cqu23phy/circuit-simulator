@@ -5,6 +5,7 @@ import { predictDiodeStates, countDiodeStateDisagreements, adaptiveDiodeGuard } 
 import { PREDEFINED_CIRCUITS } from './circuits.js';
 
 const point = (x, y) => ({ x, y });
+const ptToStr = ({ x, y }) => `${x},${y}`;
 const diodeCircuit = () => [
   { id: 'v', type: 'voltage', p1: point(0,0), p2: point(0,40), value: 5 },
   { id: 'r', type: 'resistor', p1: point(0,0), p2: point(40,0), value: 1000 },
