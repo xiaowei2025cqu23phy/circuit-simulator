@@ -1,3 +1,6 @@
+
+> **2026-10-29 第六轮勘误：**本文件下文涉及的旧定量比较采用源信号在区间起点采样（`legacy-start`）；后向欧拉受迫更新应取 `t_{n+1}`。最新统一采样方法及结果见 [第六轮报告](sixth-round-events-time-discretization.md) 和 [BE-end 研究表](../research/four_mode_be_end_v8_results.csv)。过去的误差值保留为历史记录，不应被视为最新准确性结论。
+
 # HSP-MNA experimental solver mode
 
 The existing default diode solver remains the baseline: `compileCircuit(elements, dt)`.
