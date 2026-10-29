@@ -451,6 +451,7 @@ stepEngineWithEstimatedDiodeEvent(trial);
 npm test
 npm run benchmark:hsp:secant > secant.csv
 npm run benchmark:hsp:rank1 > rank_one.csv
+node scripts/rank-one-guard-ablation.mjs > guard_ablation.csv
 ```
 
-最新实验和可核查限制见 [第七轮研究报告](docs/seventh-round-secants-rankone.md)、[48 组事件候选数据](research/event_secant_be_end_v8_results.csv) 与 [40 组低秩对照数据](research/rank_one_inverse_v8_results.csv)。隔离 V8 执行实际 JS 测试逻辑 **65/65 项通过**；但完整 npm/lint/build、设备计时与外部 ngspice 仍待验证。实验性改动保留在 Draft PR，不自动合并。
+最新实验和可核查限制见 [第七轮研究报告](docs/seventh-round-secants-rankone.md)、[48 组事件候选数据](research/event_secant_be_end_v8_results.csv) 与 [40 组低秩对照数据](research/rank_one_inverse_v8_results.csv)。隔离 V8 执行实际 JS 测试逻辑 **67/67 项通过**；但完整 npm/lint/build、设备计时与外部 ngspice 仍待验证。实验性改动保留在 Draft PR，不自动合并。
