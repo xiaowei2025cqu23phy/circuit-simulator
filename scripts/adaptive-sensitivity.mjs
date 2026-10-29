@@ -16,6 +16,8 @@ function simulate(elements, probe, timestep, mode, scale) {
     diodeSolver: mode,
     correctionGuard: 0.015,
     adaptiveScale: scale,
+    sourceSampling: 'be-end',
+    linearSolver: 'lu',
   });
   const samples = [];
   for (let i = 0; i < Math.round(duration / timestep); i++) {
@@ -24,7 +26,7 @@ function simulate(elements, probe, timestep, mode, scale) {
   }
   return { samples, diagnostics: { ...eng.diagnostics } };
 }
-console.log('circuit,scale_v,rmse_v,linear_solves,state_disagreements,unresolved_steps');
+console.log('circuit,source_sampling,scale_v,rmse_v,linear_solves,state_disagreements,unresolved_steps');
 for (const [key, probe] of circuits) {
   const elements = PREDEFINED_CIRCUITS[key].elements;
   const reference = simulate(elements, probe, refDt, 'hysteretic-corrected', 0.2);
@@ -38,7 +40,7 @@ for (const [key, probe] of circuits) {
     }
     const d = result.diagnostics;
     console.log([
-      key, scale, Math.sqrt(sum / result.samples.length).toPrecision(9),
+      key, 'be-end', scale, Math.sqrt(sum / result.samples.length).toPrecision(9),
       d.linearSolves, d.stateDisagreements, d.unresolvedSteps,
     ].join(','));
   }
