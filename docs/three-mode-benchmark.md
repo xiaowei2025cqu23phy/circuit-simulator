@@ -1,3 +1,5 @@
+> **历史数据警示（2026-10-29）：**本页 36 组结果来自原始时间步起点独立源采样（`legacy-start`），非一致 BE 受迫采样。最新 48 组同模型 BE-end 四模式数据见 [四策略新表](../research/four_mode_be_end_v8_results.csv)，以及 [第六轮勘误](sixth-round-events-time-discretization.md)。不得直接将两表视为同等实验设置。
+
 # 三种非线性器件状态求解策略的受控对照实验
 
 > 研究记录（2026-10-29）。本实验使用**实际仓库中的 JavaScript MNA/PWL 内核**，但通过隔离的 V8 执行环境运行；不包含浏览器渲染、Node.js npm 构建或真实设备 FPS 测试。GitHub Actions 因账户账单限制未能正常验证，独立 V8 测试通过 33/33 条测试逻辑。论文可引用数据，但不得称为 SPICE 精度验证。
