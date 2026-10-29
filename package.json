@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",
-    "benchmark:hsp": "node scripts/compare-hsp-mna.mjs"
+    "benchmark:hsp": "node scripts/compare-hsp-mna.mjs",
+    "benchmark:hsp:adaptive": "node scripts/adaptive-sensitivity.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.8.0",
