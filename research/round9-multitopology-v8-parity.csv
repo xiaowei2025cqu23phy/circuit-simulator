@@ -1,17 +1,26 @@
-# Research branch JS source executed in isolated V8, 2026-10-30.
-# Only deterministic numerical parity, MNA residuals and operation counters are retained.
-# Native Node time measurements MUST be obtained by running scripts/benchmark-multi-topology.mjs locally.
-# NOT physical ngspice reference, not calibrated end-to-end timing.
+# Actual research branch JavaScript executed inside isolated V8, 2026-10-30.
+# 15 actual topology cases x 3 backends; 800 transient BE steps each; parity and independent MNA residuals.
+# Timing fields intentionally OMITTED (not native Node timing). Same PWL law, not physical SPICE.
+# Run scripts/benchmark-multi-topology.mjs in native Node for valid wall-clock measurements.
 circuit,topology,scale,mna_dimension,element_count,linear_solver,diode_solver,source_sampling,dt_us,steps,linear_solves,full_factorizations,rank_one_updates,rank_one_fallbacks,matrix_rebuilds,max_joint_diode_transitions,state_disagreements,unresolved_steps,max_abs_solution_difference_mixed_units,max_abs_probe_voltage_difference_v,max_raw_mna_residual_mixed_units
-diode-bank-4,parallel-diode-bank,4,10,19,inverse,hysteretic-corrected,be-end,50.000000,800,801,2,0,0,1,4,0,0,8.83293438e-12,8.05577827e-13,8.95283847e-12
-diode-bank-4,parallel-diode-bank,4,10,19,lu,hysteretic-corrected,be-end,50.000000,800,801,2,0,0,1,4,0,0,8.83293438e-12,8.05577827e-13,8.95283847e-12
-diode-bank-4,parallel-diode-bank,4,10,19,inverse-rank1,hysteretic-corrected,be-end,50.000000,800,801,1,4,0,1,4,0,0,8.83293438e-12,8.05577827e-13,8.95283847e-12
-diode-bank-12,parallel-diode-bank,12,26,51,inverse,hysteretic-corrected,be-end,50.000000,800,801,2,0,0,1,12,0,0,8.83293438e-12,8.05577827e-13,1.46975765e-11
-diode-bank-12,parallel-diode-bank,12,26,51,lu,hysteretic-corrected,be-end,50.000000,800,801,2,0,0,1,12,0,0,8.83293438e-12,8.05577827e-13,1.46975765e-11
-diode-bank-12,parallel-diode-bank,12,26,51,inverse-rank1,hysteretic-corrected,be-end,50.000000,800,801,1,12,0,1,12,0,0,8.83293438e-12,8.05577827e-13,1.46975765e-11
-diode-bank-24,parallel-diode-bank,24,50,99,inverse,hysteretic-corrected,be-end,50.000000,800,801,2,0,0,1,24,0,0,1.02069464e-11,8.05577827e-13,2.28226327e-11
-diode-bank-24,parallel-diode-bank,24,50,99,lu,hysteretic-corrected,be-end,50.000000,800,801,2,0,0,1,24,0,0,1.02069464e-11,8.05577827e-13,2.28226327e-11
-diode-bank-24,parallel-diode-bank,24,50,99,inverse-rank1,hysteretic-corrected,be-end,50.000000,800,801,1,24,0,1,24,0,0,1.02069464e-11,8.05577827e-13,2.28226327e-11
+diode-bank-4,parallel-diode-bank-light,4,10,19,inverse,hysteretic-corrected,be-end,50.000000,800,801,2,0,0,1,4,0,0,8.83293438e-12,8.05577827e-13,8.95283847e-12
+diode-bank-4,parallel-diode-bank-light,4,10,19,lu,hysteretic-corrected,be-end,50.000000,800,801,2,0,0,1,4,0,0,8.83293438e-12,8.05577827e-13,8.95283847e-12
+diode-bank-4,parallel-diode-bank-light,4,10,19,inverse-rank1,hysteretic-corrected,be-end,50.000000,800,801,1,4,0,1,4,0,0,8.83293438e-12,8.05577827e-13,8.95283847e-12
+diode-bank-12,parallel-diode-bank-light,12,26,51,inverse,hysteretic-corrected,be-end,50.000000,800,801,2,0,0,1,12,0,0,8.83293438e-12,8.05577827e-13,1.46975765e-11
+diode-bank-12,parallel-diode-bank-light,12,26,51,lu,hysteretic-corrected,be-end,50.000000,800,801,2,0,0,1,12,0,0,8.83293438e-12,8.05577827e-13,1.46975765e-11
+diode-bank-12,parallel-diode-bank-light,12,26,51,inverse-rank1,hysteretic-corrected,be-end,50.000000,800,801,1,12,0,1,12,0,0,8.83293438e-12,8.05577827e-13,1.46975765e-11
+diode-bank-24,parallel-diode-bank-light,24,50,99,inverse,hysteretic-corrected,be-end,50.000000,800,801,2,0,0,1,24,0,0,1.02069464e-11,8.05577827e-13,2.28226327e-11
+diode-bank-24,parallel-diode-bank-light,24,50,99,lu,hysteretic-corrected,be-end,50.000000,800,801,2,0,0,1,24,0,0,1.02069464e-11,8.05577827e-13,2.28226327e-11
+diode-bank-24,parallel-diode-bank-light,24,50,99,inverse-rank1,hysteretic-corrected,be-end,50.000000,800,801,1,24,0,1,24,0,0,1.02069464e-11,8.05577827e-13,2.28226327e-11
+diode-bank-heavy-4,parallel-diode-bank-heavy,4,10,19,inverse,hysteretic-corrected,be-end,50.000000,800,808,9,0,0,8,4,0,0,1.40252254e-11,1.41108929e-12,5.62237471e-12
+diode-bank-heavy-4,parallel-diode-bank-heavy,4,10,19,lu,hysteretic-corrected,be-end,50.000000,800,808,9,0,0,8,4,0,0,1.40252254e-11,1.41108929e-12,5.62237471e-12
+diode-bank-heavy-4,parallel-diode-bank-heavy,4,10,19,inverse-rank1,hysteretic-corrected,be-end,50.000000,800,808,1,16,0,8,4,0,0,1.40252254e-11,1.41108929e-12,5.62237471e-12
+diode-bank-heavy-12,parallel-diode-bank-heavy,12,26,51,inverse,hysteretic-corrected,be-end,50.000000,800,818,19,0,0,18,12,0,0,1.27491888e-11,5.64664007e-12,4.67401427e-12
+diode-bank-heavy-12,parallel-diode-bank-heavy,12,26,51,lu,hysteretic-corrected,be-end,50.000000,800,818,19,0,0,18,12,0,0,1.27491888e-11,5.64664007e-12,4.67401427e-12
+diode-bank-heavy-12,parallel-diode-bank-heavy,12,26,51,inverse-rank1,hysteretic-corrected,be-end,50.000000,800,818,2,36,0,18,12,0,0,1.27491888e-11,5.64664007e-12,4.67401427e-12
+diode-bank-heavy-24,parallel-diode-bank-heavy,24,50,99,inverse,hysteretic-corrected,be-end,50.000000,800,820,21,0,0,20,24,0,0,1.46726800e-11,5.64106897e-12,4.34877585e-12
+diode-bank-heavy-24,parallel-diode-bank-heavy,24,50,99,lu,hysteretic-corrected,be-end,50.000000,800,820,21,0,0,20,24,0,0,1.46726800e-11,5.64106897e-12,4.34877585e-12
+diode-bank-heavy-24,parallel-diode-bank-heavy,24,50,99,inverse-rank1,hysteretic-corrected,be-end,50.000000,800,820,3,68,0,20,24,0,0,1.46726800e-11,5.64106897e-12,4.34877585e-12
 rc-ladder-4,rc-ladder,4,6,15,inverse,hysteretic-corrected,be-end,50.000000,800,800,1,0,0,0,0,0,0,3.55271368e-15,3.55271368e-15,2.77555756e-17
 rc-ladder-4,rc-ladder,4,6,15,lu,hysteretic-corrected,be-end,50.000000,800,800,1,0,0,0,0,0,0,3.55271368e-15,3.55271368e-15,2.77555756e-17
 rc-ladder-4,rc-ladder,4,6,15,inverse-rank1,hysteretic-corrected,be-end,50.000000,800,800,1,0,0,0,0,0,0,3.55271368e-15,3.55271368e-15,2.77555756e-17
