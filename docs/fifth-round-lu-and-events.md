@@ -1,3 +1,5 @@
+> **更新（2026-10-29）：**本轮早期 LU 与逆矩阵数值一致性检验采用原始 `legacy-start` 激励采样；其后研究引入可选 `be-end`，旧数值一致性实验仍可证明相同激励下的代数后端一致，但不应作为端点采样物理精度数据。见 [第六轮时间离散核查](sixth-round-events-time-discretization.md)。
+
 # Fifth research round: dense LU, scheduled switch boundaries, and device-model error
 
 Date: 2026-10-29. This is a working research record, not a peer-reviewed validation or production release.
