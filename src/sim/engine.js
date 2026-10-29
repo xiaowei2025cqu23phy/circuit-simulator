@@ -463,7 +463,7 @@ export function stepEngine(eng, probeId = null) {
 
   let x = null;
   if (eng.diodeSolver !== 'iterative') {
-    // Three research methods use the same hysteretic 0.70/0.65 V state law.
+    // Four experimental research methods use the same hysteretic 0.70/0.65 V state law.
     const predictedChanges = predictDiodeStates(validEls, switchStates, eng.previousSolution);
     if (predictedChanges) eng.needsMatrixRebuild = true;
 
