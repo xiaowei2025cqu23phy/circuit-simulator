@@ -14,7 +14,9 @@
     "benchmark:hsp": "node scripts/compare-hsp-mna.mjs",
     "benchmark:hsp:adaptive": "node scripts/adaptive-sensitivity.mjs",
     "benchmark:hsp:lu": "node scripts/compare-linear-solvers.mjs",
-    "benchmark:hsp:event": "node scripts/compare-event-refinement.mjs"
+    "benchmark:hsp:event": "node scripts/compare-event-refinement.mjs",
+    "benchmark:hsp:secant": "node scripts/compare-event-estimate.mjs",
+    "benchmark:hsp:rank1": "node scripts/compare-rank-one.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.8.0",
