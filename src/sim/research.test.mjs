@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compileCircuit, stepEngine } from './engine.js';
-import { predictDiodeStates, countDiodeStateDisagreements } from './statePrediction.js';
+import { predictDiodeStates, countDiodeStateDisagreements, adaptiveDiodeGuard } from './statePrediction.js';
 import { PREDEFINED_CIRCUITS } from './circuits.js';
 
 const point = (x, y) => ({ x, y });
@@ -105,4 +105,39 @@ test('电感续流断开事件触发混合模式的关键校正', () => {
   assert.ok(guarded.diagnostics.stateCorrections > 0, '关键切换事件应得到校正');
   assert.equal(guarded.diagnostics.stateDisagreements, 0);
   assert.ok(guardedMin > -2, '混合校正在现有续流示例中应限制负尖峰');
+});
+
+test('自适应保护阈值随二极管电压跃变单调收紧', () => {
+  const els = [{ id: 'd', type: 'diode', n1: 0, n2: -1 }];
+  const opts = { maxGuard: 0.015, scale: 0.2 };
+  assert.equal(adaptiveDiodeGuard(els, null, [1], opts), 0, '无历史解时首先使用零容差');
+  const g0 = adaptiveDiodeGuard(els, [0], [0], opts);
+  const g1 = adaptiveDiodeGuard(els, [0], [0.2], opts);
+  const g2 = adaptiveDiodeGuard(els, [0], [10], opts);
+  assert.ok(g0 > g1 && g1 > g2 && g2 >= 0);
+  assert.ok(Math.abs(g1 - 0.0075) < 1e-14);
+  assert.throws(() => adaptiveDiodeGuard(els, [0], [1], { maxGuard: 0.015, scale: 0 }), /电压尺度/);
+});
+
+test('自适应模式保留同一迟滞模型，计算次数与步数可审计', () => {
+  const eng = compileCircuit(diodeCircuit(), 1e-5, { diodeSolver: 'adaptive', adaptiveScale: 0.2 });
+  for (let i = 0; i < 100; i++) stepEngine(eng);
+  assert.equal(eng.diagnostics.steps, 100);
+  assert.ok(eng.diagnostics.linearSolves >= 100);
+  assert.ok(eng.diagnostics.stateCorrections >= 1);
+  assert.equal(eng.diagnostics.unresolvedSteps, 0);
+  assert.throws(() => compileCircuit(diodeCircuit(), 1e-5, { diodeSolver: 'adaptive', adaptiveScale: -1 }), /电压尺度/);
+});
+
+test('续流电路的自适应校正避免历史预测的一步极端负尖峰', () => {
+  const elements = PREDEFINED_CIRCUITS.freewheel.elements;
+  const adaptive = compileCircuit(elements, 1e-5, { diodeSolver: 'adaptive' });
+  let minV = Infinity;
+  for (let i = 0; i < 2000; i++) {
+    stepEngine(adaptive);
+    minV = Math.min(minV, adaptive.currentNodes[ptToStr({ x: 360, y: 260 })]);
+  }
+  assert.ok(minV > -2, '在给定续流预置电路中自适应算法应触发必要的状态校正');
+  assert.ok(adaptive.diagnostics.stateCorrections >= 1);
+  assert.equal(adaptive.diagnostics.unresolvedSteps, 0);
 });
