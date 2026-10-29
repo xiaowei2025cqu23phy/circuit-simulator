@@ -15,7 +15,7 @@
 export const GMIN = 1e-12;          // 对地弱电导（不保证任意 MNA 系统可逆）
 export const DEFAULT_DT = 1e-5;     // 默认仿真步长 10µs
 export const HISTORY_MAX = 250000;  // 波形历史最大点数
-import { predictDiodeStates, countDiodeStateDisagreements, endpointDiodeUpdates } from './statePrediction.js';
+import { predictDiodeStates, countDiodeStateDisagreements, endpointDiodeUpdates, adaptiveDiodeGuard } from './statePrediction.js';
 
 // ---------- 并查集：导线/标签/接地节点合并 ----------
 export class DSU {
@@ -242,9 +242,11 @@ function segIntersect(a1, a2, b1, b2) {
 
 export function compileCircuit(els, dt = DEFAULT_DT, options = {}) {
   const diodeSolver = options.diodeSolver ?? 'iterative';
-  if (!['iterative', 'predicted', 'guarded', 'hysteretic-corrected'].includes(diodeSolver)) throw new Error('未知二极管求解模式');
+  if (!['iterative', 'predicted', 'guarded', 'hysteretic-corrected', 'adaptive'].includes(diodeSolver)) throw new Error('未知二极管求解模式');
   const correctionGuard = options.correctionGuard ?? 0.015;
   if (!Number.isFinite(correctionGuard) || correctionGuard < 0) throw new Error('校正容差必须为非负有限数');
+  const adaptiveScale = options.adaptiveScale ?? 0.2;
+  if (!Number.isFinite(adaptiveScale) || adaptiveScale <= 0) throw new Error('自适应电压尺度必须大于零');
   const dsu = new DSU();
   let hasGround = false;
   const labelsByText = {};
@@ -378,9 +380,9 @@ export function compileCircuit(els, dt = DEFAULT_DT, options = {}) {
     dt, t: 0, size, N, M, A_inv, validEls, branchEls, branchMap, dsu, nodeMap, finalGroundRoot,
     state: {}, history: [], currentNodes: {}, allEls: engineEls, switchStates,
     needsMatrixRebuild: false, lastMeasured: null, lastUiTime: 0,
-    diodeSolver, correctionGuard, previousSolution: null,
+    diodeSolver, correctionGuard, adaptiveScale, previousSolution: null,
     diagnostics: { steps: 0, linearSolves: 0, matrixRebuilds: 0, stateDisagreements: 0, unresolvedSteps: 0,
-      stateCorrections: 0, stepsWithCorrections: 0 },
+      stateCorrections: 0, stepsWithCorrections: 0, adaptiveTightenedSteps: 0 },
   };
 }
 
@@ -451,13 +453,21 @@ export function stepEngine(eng, probeId = null) {
     // *current* endpoint violates the same hysteresis transition law.
     let settled = false;
     let correctedThisStep = false;
+    let tightenedThisStep = false;
     let statesUsedForLastSolve = null;
     for (let iter = 0; iter < 12; iter++) {
       statesUsedForLastSolve = { ...switchStates };
       x = assembleAndSolve();
       if (eng.diodeSolver === 'predicted') { settled = true; break; }
 
-      const guard = eng.diodeSolver === 'guarded' ? eng.correctionGuard : 0;
+      let guard = eng.diodeSolver === 'guarded' ? eng.correctionGuard : 0;
+      if (eng.diodeSolver === 'adaptive') {
+        guard = adaptiveDiodeGuard(validEls, eng.previousSolution, x, {
+          maxGuard: eng.correctionGuard,
+          scale: eng.adaptiveScale,
+        });
+        if (guard < eng.correctionGuard / 2) tightenedThisStep = true;
+      }
       const updates = endpointDiodeUpdates(validEls, switchStates, x, guard);
       if (updates.length === 0) { settled = true; break; }
       for (const update of updates) switchStates[update.id] = update.nextOn;
@@ -474,6 +484,7 @@ export function stepEngine(eng, probeId = null) {
       eng.needsMatrixRebuild = false;
     }
     if (correctedThisStep) eng.diagnostics.stepsWithCorrections += 1;
+    if (tightenedThisStep) eng.diagnostics.adaptiveTightenedSteps += 1;
     eng.diagnostics.stateDisagreements += countDiodeStateDisagreements(validEls, switchStates, x);
   } else {
     // Legacy baseline: retains reverse-current release criterion and is NOT
