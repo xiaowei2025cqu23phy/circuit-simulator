@@ -21,6 +21,7 @@ test('deterministic electrical fixtures have a grounded voltage source and valid
   assert.equal(compileCircuit(makeReactiveLadder(16,{kind:'rlc'}),5e-5,researchOptions('lu')).size,50);
   assert.throws(()=>makeParallelDiodeBank(1),/无效/);
   assert.throws(()=>makeParallelDiodeBank(80),/无效/);
+  assert.throws(()=>makeParallelDiodeBank(4,{loadProfile:'unknown'}),/无效/);
   assert.throws(()=>makeReactiveLadder(3,{kind:'unknown'}),/无效/);
   assert.throws(()=>makeReactiveLadder(0),/无效/);
 });
@@ -143,4 +144,49 @@ test('independent MNA residual detects missing capacitor history and rejects uns
   });
   stepEngine(legacy);
   assert.throws(()=>acceptedMnaResidual(legacy,{}),/BE/);
+});
+
+
+test('heavy-load 12-diode bank repeatedly opens and closes with accurate MNA cache updates',()=>{
+  const elements=makeParallelDiodeBank(12,{loadProfile:'heavy'});
+  const engines=['inverse','lu','inverse-rank1'].map(linearSolver=>
+    compileCircuit(elements,5e-5,researchOptions(linearSolver)));
+  let previous={...engines[0].switchStates};
+  let switchedOn=0,switchedOff=0,maxJoint=0,maxUnknownDiff=0,maxResidual=0;
+  for(let step=0;step<800;step++){
+    const histories=engines.map(e=>({...e.state}));
+    engines.forEach(e=>stepEngine(e));
+    let switched=0;
+    for(const id of Object.keys(previous).filter(k=>k.startsWith('diode'))){
+      if(previous[id]!==engines[0].switchStates[id]){
+        switched++;
+        if(engines[0].switchStates[id])switchedOn++;
+        else switchedOff++;
+      }
+    }
+    maxJoint=Math.max(maxJoint,switched);
+    previous={...engines[0].switchStates};
+    for(let i=1;i<3;i++){
+      maxUnknownDiff=Math.max(maxUnknownDiff,
+        maxDifference(engines[0].previousSolution,engines[i].previousSolution));
+      assert.deepEqual(engines[0].switchStates,engines[i].switchStates);
+    }
+    if(switched || step%41===0){
+      engines.forEach((e,i)=>{
+        maxResidual=Math.max(maxResidual,acceptedMnaResidual(e,histories[i]).absolute);
+      });
+    }
+  }
+  assert.ok(switchedOn>=24,'two AC cycles must reopen all 12 PWL branches');
+  assert.ok(switchedOff>=24,'two AC cycles must close all 12 PWL branches');
+  assert.equal(maxJoint,12);
+  assert.ok(maxUnknownDiff<1e-7);
+  assert.ok(maxResidual<1e-8);
+  assert.ok(engines.every(e=>e.diagnostics.unresolvedSteps===0));
+  assert.ok(engines.every(e=>e.diagnostics.stateDisagreements===0));
+  const rank=engines[2].diagnostics;
+  assert.ok(rank.rankOneUpdates>=24,'updates should be reused across multiple transitions');
+  assert.ok(rank.factorizations>=2,
+    'maxRankOneUpdates must force occasional full inverse reconstruction');
+  assert.ok(rank.factorizations<engines[0].diagnostics.factorizations);
 });
