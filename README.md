@@ -375,3 +375,18 @@ console.log(guarded.diagnostics);
 - 研究模式的误差与计算收益必须用同一器件模型及时间网格进行对照验证；不应从单次求解特性直接宣称实际速度提升。由于 GitHub Actions 账户配额限制，CI 运行状态并不代表代码测试结果，请本地执行 `npm test`、`npm run lint`、`npm run build`。
 
 详见 [HSP-MNA 研究方法说明](docs/hsp-mna-research.md)。
+
+
+### 第四轮：自适应状态校正（研究模式，不改默认引擎）
+
+新增 `compileCircuit(elements, dt, { diodeSolver: 'adaptive', correctionGuard: 0.015, adaptiveScale: 0.2 })`。使用与其他三个研究模式相同的 0.70/0.65 V 迟滞 PWL 模型，自适应校正容差为 `gamma=gammaMax/(1+max|deltaVD|/adaptiveScale)`。这是启发式触发条件，**不是严格误差上界，也不保证无条件稳定**。
+
+研究工具：
+
+```bash
+npm test
+npm run benchmark:hsp > four_modes.csv
+npm run benchmark:hsp:adaptive > adaptive_sensitivity.csv
+```
+
+运行限制：本轮读取仓库实际 JavaScript 源码，在隔离 V8 中执行测试逻辑，**37/37 通过**；但受本地仓库不可克隆及 Actions 账单因素影响，尚未完整执行 Node npm、lint 或构建。并未运行 ngspice。详见 [第四轮报告](docs/adaptive-study.md) 和 [四模式结果 CSV](research/engine_four_mode_v8_results.csv)。实验性分支未经合并，勿称为稳定发行版。
