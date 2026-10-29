@@ -71,8 +71,8 @@ function rhsFor(n,k,event) {
 }
 function multiply(A,x){return A.map(row=>row.reduce((s,v,j)=>s+v*x[j],0));}
 function run(n,method) {
-  const start=performance.now();
   const mna=generateMNA(n),A=mna.A,branch=mna.branch;
+  const start=performance.now();
   let inverse=null,lu=null,full=0,rank=0,fall=0,solves=0,residual=0;
   const values=[];
   if(method==='dense-lu') {lu=factorizeLU(A);if(!lu)throw Error('Initial LU failed');}
