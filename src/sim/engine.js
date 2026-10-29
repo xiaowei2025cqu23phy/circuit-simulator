@@ -15,7 +15,7 @@
 export const GMIN = 1e-12;          // 对地弱电导（不保证任意 MNA 系统可逆）
 export const DEFAULT_DT = 1e-5;     // 默认仿真步长 10µs
 export const HISTORY_MAX = 250000;  // 波形历史最大点数
-import { predictDiodeStates, countDiodeStateDisagreements } from './statePrediction.js';
+import { predictDiodeStates, countDiodeStateDisagreements, endpointDiodeUpdates } from './statePrediction.js';
 
 // ---------- 并查集：导线/标签/接地节点合并 ----------
 export class DSU {
@@ -242,7 +242,9 @@ function segIntersect(a1, a2, b1, b2) {
 
 export function compileCircuit(els, dt = DEFAULT_DT, options = {}) {
   const diodeSolver = options.diodeSolver ?? 'iterative';
-  if (!['iterative', 'predicted'].includes(diodeSolver)) throw new Error('未知二极管求解模式');
+  if (!['iterative', 'predicted', 'guarded', 'hysteretic-corrected'].includes(diodeSolver)) throw new Error('未知二极管求解模式');
+  const correctionGuard = options.correctionGuard ?? 0.015;
+  if (!Number.isFinite(correctionGuard) || correctionGuard < 0) throw new Error('校正容差必须为非负有限数');
   const dsu = new DSU();
   let hasGround = false;
   const labelsByText = {};
@@ -376,8 +378,9 @@ export function compileCircuit(els, dt = DEFAULT_DT, options = {}) {
     dt, t: 0, size, N, M, A_inv, validEls, branchEls, branchMap, dsu, nodeMap, finalGroundRoot,
     state: {}, history: [], currentNodes: {}, allEls: engineEls, switchStates,
     needsMatrixRebuild: false, lastMeasured: null, lastUiTime: 0,
-    diodeSolver, previousSolution: null,
-    diagnostics: { steps: 0, linearSolves: 0, matrixRebuilds: 0, stateDisagreements: 0, unresolvedSteps: 0 },
+    diodeSolver, correctionGuard, previousSolution: null,
+    diagnostics: { steps: 0, linearSolves: 0, matrixRebuilds: 0, stateDisagreements: 0, unresolvedSteps: 0,
+      stateCorrections: 0, stepsWithCorrections: 0 },
   };
 }
 
@@ -438,46 +441,66 @@ export function stepEngine(eng, probeId = null) {
   };
 
   let x = null;
-  if (eng.diodeSolver === 'predicted') {
-    // 单步外推：在求解前使用上一时间步接受的电压判定状态。
-    const changed = predictDiodeStates(validEls, switchStates, eng.previousSolution);
-    if (changed) eng.needsMatrixRebuild = true;
-    x = assembleAndSolve();
+  if (eng.diodeSolver !== 'iterative') {
+    // Three research methods use the same hysteretic 0.70/0.65 V state law.
+    const predictedChanges = predictDiodeStates(validEls, switchStates, eng.previousSolution);
+    if (predictedChanges) eng.needsMatrixRebuild = true;
+
+    // A single solve is sufficient for the deliberately approximate predictor.
+    // Guarded and endpoint-corrected modes may perform extra solves when the
+    // *current* endpoint violates the same hysteresis transition law.
+    let settled = false;
+    let statesUsedForLastSolve = null;
+    for (let iter = 0; iter < 12; iter++) {
+      statesUsedForLastSolve = { ...switchStates };
+      x = assembleAndSolve();
+      if (eng.diodeSolver === 'predicted') { settled = true; break; }
+
+      const guard = eng.diodeSolver === 'guarded' ? eng.correctionGuard : 0;
+      const updates = endpointDiodeUpdates(validEls, switchStates, x, guard);
+      if (updates.length === 0) { settled = true; break; }
+      for (const update of updates) switchStates[update.id] = update.nextOn;
+      eng.diagnostics.stateCorrections += updates.length;
+      eng.needsMatrixRebuild = true;
+    }
+    if (!settled) {
+      // Some switched networks do not have a consistent finite-state endpoint.
+      // Preserve the state used for the last SOLVED matrix and warn, rather
+      // than returning mismatched voltages and device states.
+      eng.diagnostics.unresolvedSteps += 1;
+      Object.assign(switchStates, statesUsedForLastSolve);
+      eng.needsMatrixRebuild = false;
+    }
     eng.diagnostics.stateDisagreements += countDiodeStateDisagreements(validEls, switchStates, x);
   } else {
-  let converged = false;
-  let statesUsedForLastSolve = null;
-  for (let iter = 0; iter < 12; iter++) {
-    // Snapshot before assembling: the solution corresponds to THESE states.
-    statesUsedForLastSolve = { ...switchStates };
-    x = assembleAndSolve();
-    let changed = false;
-    validEls.forEach(el => {
-      if (el.type !== 'diode') return;
-      const vD = (el.n1 >= 0 ? x[el.n1] : 0) - (el.n2 >= 0 ? x[el.n2] : 0);
-      const wasON = switchStates[el.id];
-      if (!wasON) {
-        if (vD > 0.7) { switchStates[el.id] = true; changed = true; }
-      } else {
-        // 导通压降模型下 vD = 0.7 + i·Ron 恒 ≥ 0.7，
-        // 故必须用电流判据释放：模型电流为负（被电路反向驱动）→ 关断阻断
-        const iD = (vD - 0.7) / 0.05;
-        if (iD < -1e-6) { switchStates[el.id] = false; changed = true; }
-      }
-    });
-    if (changed) { eng.needsMatrixRebuild = true; continue; }
-    converged = true;
-    break;
-  }
-  // A hard-switch model may have no consistent discrete state near its
-  // boundary. Keep the last SOLVED matrix/solution pair together rather than
-  // silently using a voltage calculated from the previous state.
-  // Preserve the legacy time-stepping API; expose the warning for research.
-  if (!converged) {
-    eng.diagnostics.unresolvedSteps += 1;
-    Object.assign(switchStates, statesUsedForLastSolve);
-    eng.needsMatrixRebuild = false;
-  }
+    // Legacy baseline: retains reverse-current release criterion and is NOT
+    // the same state law as the three experimental research modes.
+    let converged = false;
+    let statesUsedForLastSolve = null;
+    for (let iter = 0; iter < 12; iter++) {
+      statesUsedForLastSolve = { ...switchStates };
+      x = assembleAndSolve();
+      let changed = false;
+      validEls.forEach(el => {
+        if (el.type !== 'diode') return;
+        const vD = (el.n1 >= 0 ? x[el.n1] : 0) - (el.n2 >= 0 ? x[el.n2] : 0);
+        const wasON = switchStates[el.id];
+        if (!wasON) {
+          if (vD > 0.7) { switchStates[el.id] = true; changed = true; }
+        } else {
+          const iD = (vD - 0.7) / 0.05;
+          if (iD < -1e-6) { switchStates[el.id] = false; changed = true; }
+        }
+      });
+      if (changed) { eng.needsMatrixRebuild = true; continue; }
+      converged = true;
+      break;
+    }
+    if (!converged) {
+      eng.diagnostics.unresolvedSteps += 1;
+      Object.assign(switchStates, statesUsedForLastSolve);
+      eng.needsMatrixRebuild = false;
+    }
   }
   eng.previousSolution = x.slice();
   eng.diagnostics.steps += 1;
