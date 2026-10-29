@@ -20,7 +20,7 @@ const dt = 1e-5, duration = 0.04, repetitions = 5;
 
 function simulate(elements, probe, diodeSolver, linearSolver) {
   const compilationStart = performance.now();
-  const engine = compileCircuit(elements, dt, { diodeSolver, linearSolver });
+  const engine = compileCircuit(elements, dt, { diodeSolver, linearSolver, sourceSampling: 'be-end' });
   const compileMs = performance.now() - compilationStart;
   const trace = [];
   const start = performance.now();
@@ -39,7 +39,7 @@ function median(values) {
   return sorted[Math.floor(sorted.length / 2)];
 }
 const keys = [
-  'circuit','diode_solver','linear_solver','steps','median_compile_ms','median_simulate_ms',
+  'circuit','diode_solver','linear_solver','source_sampling','steps','median_compile_ms','median_simulate_ms',
   'linear_solves','factorizations','matrix_rebuilds','max_abs_voltage_difference_v',
   'rmse_difference_v','unresolved_steps','node_version',
 ];
@@ -66,6 +66,7 @@ for (const [name, probe] of cases) {
       const result = results[linearSolver][0];
       const row = {
         circuit: name, diode_solver: diodeSolver, linear_solver: linearSolver,
+        source_sampling: 'be-end',
         steps: result.trace.length,
         median_compile_ms: median(results[linearSolver].map(x => x.compileMs)).toFixed(6),
         median_simulate_ms: median(results[linearSolver].map(x => x.solveMs)).toFixed(6),
