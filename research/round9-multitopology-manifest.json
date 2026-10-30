@@ -43,7 +43,11 @@
       "testsPassed": 67,
       "total": 67
     },
-    "nativeNodeNewCommit": "NOT RUN AFTER NEW COMMITS",
+    "nativeNodeNewCommit": {
+      "status": "RUN",
+      "supersededBy": "research/round9-native-manifest.json",
+      "note": "Native Node runs happened after commit 06025ac; see the native manifest for commit-relative evidence and hashes."
+    },
     "ngspice": "NOT RUN",
     "wallTimeBenchmarksForNewMultiTopology": "NOT RUN"
   },

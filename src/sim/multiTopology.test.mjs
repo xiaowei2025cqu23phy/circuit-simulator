@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compileCircuit, stepEngine, ptToStr } from './engine.js';
-import { makeParallelDiodeBank, makeReactiveLadder } from './researchCircuits.js';
+import { makeParallelDiodeBank, makeLargeDiodeBank, makeReactiveLadder, makeLargeLadder } from './researchCircuits.js';
 import { acceptedMnaResidual } from './mnaResidual.js';
 
 const researchOptions = (linearSolver, extras={}) => ({
@@ -137,13 +137,109 @@ test('independent MNA residual detects missing capacitor history and rejects uns
   const previous={...e.state};
   stepEngine(e);
   assert.ok(acceptedMnaResidual(e,previous).absolute<1e-9);
-  assert.ok(acceptedMnaResidual(e,{}).absolute>1e-4,
-    'forgetting previous capacitor history MUST alter the equation residual');
+  assert.throws(()=>acceptedMnaResidual(e,{}),/动态元件历史状态/,
+    'an incomplete pre-step history must be rejected, not treated as zero');
+  const zeroed=Object.fromEntries(Object.keys(previous).map(id=>[id,0]));
+  assert.ok(acceptedMnaResidual(e,zeroed).absolute>1e-4,
+    'zeroing the (complete) previous capacitor history MUST alter the equation residual');
   const legacy=compileCircuit(elements,5e-5,{
     diodeSolver:'hysteretic-corrected',sourceSampling:'legacy-start',
   });
   stepEngine(legacy);
   assert.throws(()=>acceptedMnaResidual(legacy,{}),/BE/);
+});
+
+test('MNA residual reports KCL ampere rows and KVL volt rows separately',()=>{
+  const elements=makeReactiveLadder(6,{kind:'rlc'});
+  const e=compileCircuit(elements,5e-5,researchOptions('lu'));
+  for(let i=0;i<80;i++)stepEngine(e);
+  const previous={...e.state};
+  stepEngine(e);
+  const r=acceptedMnaResidual(e,previous);
+  assert.equal(r.nodeRowCount,e.N);
+  assert.equal(r.branchRowCount,e.M);
+  assert.equal(r.nodeRowCount+r.branchRowCount,e.size);
+  assert.ok(r.branchRowCount>0,'RLC ladder must have KVL branch-current rows');
+  assert.ok(Number.isFinite(r.kclAbsolute)&&Number.isFinite(r.kvlAbsolute));
+  assert.ok(r.kclAbsolute<1e-9,'KCL residual should be tiny: '+r.kclAbsolute);
+  assert.ok(r.kvlAbsolute<1e-9,'KVL residual should be tiny: '+r.kvlAbsolute);
+  assert.ok(Number.isFinite(r.kclRelative)&&Number.isFinite(r.kvlRelative));
+  assert.ok(Math.abs(r.absolute-Math.max(r.kclAbsolute,r.kvlAbsolute))<1e-30,
+    'legacy mixed scalar must remain the max of the dimension-correct norms');
+  // The inductor branch currents are independent unknowns, so at least one
+  // KVL row actually carries a non-trivial current history.
+  const currents=elements.filter(el=>el.type==='inductor')
+    .map(el=>e.previousSolution[e.branchMap[el.id]]);
+  assert.ok(currents.some(v=>Math.abs(v)>1e-6),
+    'inductor branch currents must be part of the compared MNA unknown vector');
+});
+
+test('64/96/128-dimensional real-element fixtures solve with dimension-correct residuals',()=>{
+  for(const kind of ['rc','rl']){
+    for(const size of [64,96,128]){
+      const elements=makeLargeLadder(size,{kind});
+      const engines=['inverse','lu','inverse-rank1'].map(linearSolver=>
+        compileCircuit(elements,5e-5,researchOptions(linearSolver)));
+      assert.equal(engines[0].size,size,'compiled dimension for '+kind+'/'+size);
+      let maxDiff=0,maxKcl=0,maxKvl=0;
+      for(let step=0;step<200;step++){
+        const previous=engines.map(e=>({...e.state}));
+        engines.forEach(e=>stepEngine(e));
+        for(let i=1;i<3;i++){
+          maxDiff=Math.max(maxDiff,
+            maxDifference(engines[0].previousSolution,engines[i].previousSolution));
+        }
+        if(step%37===0){
+          engines.forEach((e,j)=>{
+            const r=acceptedMnaResidual(e,previous[j]);
+            maxKcl=Math.max(maxKcl,r.kclAbsolute);
+            maxKvl=Math.max(maxKvl,r.kvlAbsolute);
+          });
+        }
+      }
+      assert.ok(maxDiff<1e-8,kind+'/'+size+' backend disagreement: '+maxDiff);
+      assert.ok(maxKcl<1e-8,kind+'/'+size+' KCL residual: '+maxKcl);
+      assert.ok(maxKvl<1e-8,kind+'/'+size+' KVL residual: '+maxKvl);
+      assert.ok(engines.every(e=>e.diagnostics.unresolvedSteps===0));
+      assert.ok(Number.isFinite(engines[0].currentNodes[ptToStr(elements.at(-1).p1)]));
+    }
+  }
+  // A 128-dimensional diode bank (63 real PWL branches) exercises joint switching.
+  const bank=makeLargeDiodeBank(63);
+  const e=compileCircuit(bank,5e-5,researchOptions('inverse-rank1'));
+  assert.equal(e.size,128);
+  let joint=0;
+  let previous={...e.switchStates};
+  for(let step=0;step<400;step++){
+    stepEngine(e);
+    const changed=Object.keys(previous)
+      .filter(id=>id.startsWith('diode')&&previous[id]!==e.switchStates[id]).length;
+    joint=Math.max(joint,changed);
+    previous={...e.switchStates};
+  }
+  assert.equal(joint,63,'all 63 PWL branches should switch in one nominal step');
+  assert.equal(e.diagnostics.unresolvedSteps,0);
+  // The default 32-update cap cannot absorb a 63-branch joint transition, so
+  // the engine must rebuild instead of attempting an incomplete update chain.
+  assert.equal(e.diagnostics.rankOneUpdates,0);
+  assert.ok(e.diagnostics.factorizations>=2,'capped bank must rebuild the matrix');
+  // With the cap raised the same transition is handled by 63 rank-one updates.
+  const wide=compileCircuit(bank,5e-5,researchOptions('inverse-rank1',{maxRankOneUpdates:512}));
+  let previousWide={...wide.switchStates};
+  let jointWide=0;
+  for(let step=0;step<400;step++){
+    stepEngine(wide);
+    const changed=Object.keys(previousWide)
+      .filter(id=>id.startsWith('diode')&&previousWide[id]!==wide.switchStates[id]).length;
+    jointWide=Math.max(jointWide,changed);
+    previousWide={...wide.switchStates};
+  }
+  assert.equal(jointWide,63);
+  assert.ok(wide.diagnostics.rankOneUpdates>=63,'raised cap should allow the joint update');
+  assert.equal(wide.diagnostics.rankOneFallbacks,0);
+  assert.equal(wide.diagnostics.unresolvedSteps,0);
+  assert.ok(maxDifference(e.previousSolution,wide.previousSolution)<1e-8,
+    'capped rebuild and wide rank-one paths must agree on the same PWL system');
 });
 
 

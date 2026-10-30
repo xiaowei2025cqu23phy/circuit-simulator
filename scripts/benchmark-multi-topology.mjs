@@ -58,6 +58,7 @@ const fields=[
   'max_abs_solution_difference_mixed_units',
   'max_abs_probe_voltage_difference_v',
   'max_raw_mna_residual_mixed_units',
+  'max_kcl_residual_a','max_kvl_residual_v',
   'node_version','cpu_model',
 ];
 
@@ -85,7 +86,7 @@ function quantiles(xs){
 function verify(elements){
   const engines=solvers.map(s=>buildEngine(elements,s));
   const probe=ptToStr(elements.at(-1).p1);
-  let maxUnknown=0,maxProbe=0,maxResidual=0,maxJoint=0;
+  let maxUnknown=0,maxProbe=0,maxResidual=0,maxJoint=0,maxKcl=0,maxKvl=0;
   let previousStates={...engines[0].switchStates};
   for(let k=0;k<steps;k++){
     const dynamicBefore=engines.map(e=>({...e.state}));
@@ -111,8 +112,13 @@ function verify(elements){
       for(let q=0;q<3;q++){
         const residual=acceptedMnaResidual(engines[q],dynamicBefore[q]);
         maxResidual=Math.max(maxResidual,residual.absolute);
-        if(!Number.isFinite(residual.relative) || residual.relative>1e-8)
-          throw Error('Accepted MNA residual violation at step '+k+': '+residual.relative);
+        maxKcl=Math.max(maxKcl,residual.kclAbsolute);
+        maxKvl=Math.max(maxKvl,residual.kvlAbsolute);
+        // KCL rows are in amperes and KVL rows in volts; check them separately.
+        if(!Number.isFinite(residual.kclRelative) || residual.kclRelative>1e-8)
+          throw Error('KCL residual violation at step '+k+': '+residual.kclRelative);
+        if(!Number.isFinite(residual.kvlRelative) || residual.kvlRelative>1e-8)
+          throw Error('KVL residual violation at step '+k+': '+residual.kvlRelative);
       }
     }
   }
@@ -121,7 +127,7 @@ function verify(elements){
     throw Error('Linear solver parity exceeded 1e-6: '+maxUnknown+' / '+maxProbe);
   if(engines.some(e=>e.diagnostics.unresolvedSteps>0))
     throw Error('Unresolved diode state in benchmark case');
-  return {maxUnknown,maxProbe,maxResidual,maxJoint};
+  return {maxUnknown,maxProbe,maxResidual,maxKcl,maxKvl,maxJoint};
 }
 
 console.error(JSON.stringify({
@@ -162,6 +168,8 @@ for(const scenario of scenarios){
       max_abs_solution_difference_mixed_units:proof.maxUnknown.toExponential(8),
       max_abs_probe_voltage_difference_v:proof.maxProbe.toExponential(8),
       max_raw_mna_residual_mixed_units:proof.maxResidual.toExponential(8),
+      max_kcl_residual_a:proof.maxKcl.toExponential(8),
+      max_kvl_residual_v:proof.maxKvl.toExponential(8),
       node_version:process.version,cpu_model:cpu,
     };
     console.log(fields.map(k=>row[k]).join(','));

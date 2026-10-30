@@ -15,9 +15,9 @@ dist/assets/index-BzyQWl5J.css   22.77 kB │ gzip:  5.02 kB
 dist/assets/index-RhUDlJ9p.js   275.89 kB │ gzip: 87.39 kB
 
 [PLUGIN_TIMINGS] Warning: Your build spent significant time in plugins. Here is a breakdown:
-  - vite:css (45%)
-  - vite:build-html (33%)
-  - rolldown:vite-resolve (19%)
+  - vite:css (39%)
+  - vite:build-html (32%)
+  - rolldown:vite-resolve (26%)
 See https://rolldown.rs/options/checks#plugintimings for more details.
 
-✓ built in 5.13s
+✓ built in 5.47s

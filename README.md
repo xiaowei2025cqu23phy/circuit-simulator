@@ -473,16 +473,18 @@ node scripts/rank-one-guard-ablation.mjs > guard_ablation.csv
 
 本节仅属于 research/hsp-mna-local-validation 验证分支及 Draft PR #2，不会更改 main 默认行为。新增的研究电路构造、线性残量检查及 benchmark 直接使用 compileCircuit / stepEngine：
 
-- src/sim/researchCircuits.js：轻/重负载并联 4/12/24 二极管网络，以及 4/8/16 级 RC/RL/RLC 网络。
-- src/sim/mnaResidual.js：根据**求解前**电容电压与电感电流重建已接受 BE MNA 方程，检查真实全系统残量，而不只是对照两个求解器的终端波形。
-- src/sim/multiTopology.test.mjs：新增七项多二极管/电容/电感/定时开关缓存与回归测试。
+- src/sim/researchCircuits.js：轻/重负载并联 4/12/24 二极管网络，4/8/16 级 RC/RL/RLC 网络，以及面向 64/96/128/256 阶的 `makeLargeDiodeBank` / `makeLargeLadder`。
+- src/sim/mnaResidual.js：根据**求解前**电容电压与电感电流重建已接受 BE MNA 方程，**分别**返回 KCL（安培）与 KVL（伏特）残量，避免把两种量纲混进同一个范数。
+- src/sim/multiTopology.test.mjs：多二极管/电容/电感/定时开关缓存、残量量纲与大阶数网络的回归测试。
 - scripts/benchmark-multi-topology.mjs：真正的 Node.js 全瞬态内核计时，可运行 npm run benchmark:hsp:topologies。
-- scripts/inspect-pwl-current-direction.mjs：审查迟滞 PWL 宏模型中 ON 支路反向电流，避免用状态一致性误称物理二极管精度。
+- scripts/benchmark-large-mna.mjs：64/96/128/256 阶真实器件网络计时，npm run benchmark:hsp:large。
+- scripts/inspect-pwl-current-direction.mjs：审查迟滞 PWL 宏模型中 ON 支路反向电流，并与 legacy `iterative` 基线对照。
+- scripts/verify-pwl-reverse-current.mjs：独立重写 MNA 装配与高斯消元，复核反向电流不是求解器缺陷。
 
-**初步执行证据：** 74/74 项测试逻辑通过隔离 V8 执行，新增 15 拓扑×3 后端共 45 行数值对照。在这些有限算例中，全 MNA 代数未知量最大差约 1.47e−11（电压和支路电流混合单位），最大原始逐行 MNA 残量约 2.28e−11（KCL/KVL 混合量纲），24 个二极管可同一步切换。重负载版本会在 40 ms 内反复 ON/OFF。
+**原生 Node 执行证据（本机 Node v26.8.1 / Windows 11 / Ryzen 5 7520U）：** npm test **76/76 通过**、lint 通过、build 通过。多拓扑 45 行：MNA 未知量最大差 1.47e−11（电压与支路电流混合单位），KCL 残量 ≤2.28e−11 A，KVL 残量 ≤1.95e−14 V，24 支二极管可同一步切换。大电路扩展到 256 阶：127 支二极管同步切换，KCL ≤2.27e−11 A、KVL ≤3.34e−13 V，无未收敛步。
 
-**关键负结果：** 当前人为设定的 0.70/0.65 V 迟滞区，在 ON 状态允许最多约 −1 A 的反向电流：stateDisagreements=0 并不代表物理二极管单向导通条件成立。该数值宏模型需要独立的物理精度研究，不得视为真实 SPICE 二极管。
+**关键负结果一（性能）：** 减少完整求逆次数不等于加速。32 个电路场景中 rank-one 只有 3 个快于 LU，27 个以 LU 最快；256 阶重负载二极管网络里 rank-one 把完整求逆从 21 次降到 9 次，耗时却约为 LU 的 1.88 倍。
 
-原始数值数据：research/round9-multitopology-v8-parity.csv、research/round9-pwl-reverse-current-v8.csv；版本证明：research/round9-multitopology-manifest.json；详细报告：docs/hsp-mna-round9-multitopology-followup.md。
+**关键负结果二（器件模型）：** 0.70/0.65 V 迟滞区允许 ON 支路最多约 −1 A 反向电流。legacy `iterative` 基线因有反向电流释放规则，实测 0 个负 ON 样本（最小 +3.59 µA / +9.52 mA）；四种研究模式分别有 1670/3180 与 320/1832 个负样本（最小 −8.27 mA / −0.994 A）。`stateDisagreements=0` 只代表迟滞电压判据自洽，不代表物理二极管单向导通。研究模式与基线因此不是同一器件模型，跨模式误差比较必须声明这一点。
 
-**重要：** 新增改动还没有新的原生 Windows/Node npm test/lint/build 日志及 benchmark wall-clock 测量；之前的 67/67 原生 Node 通过日志只对应旧 commit。需要让本机验证者重跑，不得将 74/74 V8 写成 74/74 原生 npm 已通过。
+原始数值数据：research/round9-multitopology-v8-parity.csv、research/round9-pwl-reverse-current-v8.csv（隔离 V8）；research/round9-multitopology-node.csv、research/round9-large-mna-node.csv、research/round9-pwl-reverse-current-node.csv、research/round9-pwl-reverse-current-independent.csv（原生 Node）。详细报告：docs/hsp-mna-round9-multitopology-followup.md、docs/hsp-mna-paper-code-consistency-review.md。

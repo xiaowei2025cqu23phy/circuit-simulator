@@ -1,0 +1,1 @@
+{"node":"v26.8.1","platform":"win32","cpu":"AMD Ryzen 5 7520U with Radeon Graphics         ","repetitions":5,"dt":0.00005,"steps":800,"caseCount":15,"scope":"native Node core transient, NOT browser UI, SPICE or exact physical device"}

@@ -22,12 +22,25 @@ const validCount = (n, max = 64) =>
  * under a shared AC drive, whereas light-load branches may stay ON.
  * These are numerical PWL stress fixtures, NOT physical diode claims.
  */
-export function makeParallelDiodeBank(count, {
+export function makeParallelDiodeBank(count, options = {}) {
+  return buildDiodeBank(count, 64, options);
+}
+
+/**
+ * Same topology with a raised fixture limit so the dense MNA system can reach
+ * 64 (31 diodes), 96 (47), 128 (63) and 256 (127) unknowns.
+ * This is still a numerical PWL stress fixture, not a physical bank.
+ */
+export function makeLargeDiodeBank(count, options = {}) {
+  return buildDiodeBank(count, 128, options);
+}
+
+function buildDiodeBank(count, maxCount, {
   frequency = 50,
   peakVoltage = 8,
   loadProfile = 'light',
 } = {}) {
-  if (!validCount(count) || !Number.isFinite(frequency) || frequency <= 0 ||
+  if (!validCount(count, maxCount) || !Number.isFinite(frequency) || frequency <= 0 ||
       !Number.isFinite(peakVoltage) || peakVoltage <= 0 ||
       !['light','heavy'].includes(loadProfile)) {
     throw new Error('无效的多二极管研究电路参数');
@@ -60,10 +73,44 @@ export function makeParallelDiodeBank(count, {
  *
  * A single terminal at the last stage is the reproducible voltage probe.
  */
-export function makeReactiveLadder(stages, {
+export function makeReactiveLadder(stages, options = {}) {
+  if (!validCount(stages)) throw new Error('无效的多级反应网络参数');
+  return makeReactiveLadderScaled(stages, options);
+}
+
+/**
+ * Ladder fixture sized from a target MNA dimension instead of a stage count.
+ *
+ * Dense MNA dimensions (one ideal voltage-source branch current is added):
+ *   rc  : size = stages + 2       -> stages = size - 2
+ *   rl  : size = 2*stages + 2     -> stages = (size - 2) / 2
+ *   rlc : size = 3*stages + 2     -> stages = (size - 2) / 3
+ *
+ * Only exact integer stage counts are accepted, so the caller can request
+ * 64/96/128/256 and verify the resulting dimension from the compiled engine.
+ */
+export function makeLargeLadder(targetSize, {
+  kind = 'rc', frequency = 25, peakVoltage = 5,
+} = {}) {
+  const divisors = { rc: 1, rl: 2, rlc: 3 };
+  const divisor = divisors[kind];
+  if (!Number.isInteger(targetSize) || targetSize < 4 || targetSize > 512 || !divisor) {
+    throw new Error('无效的目标 MNA 阶数');
+  }
+  if ((targetSize - 2) % divisor !== 0) {
+    throw new Error('目标 MNA 阶数与网络类型不匹配: ' + kind + '/' + targetSize);
+  }
+  const stages = (targetSize - 2) / divisor;
+  if (!Number.isInteger(stages) || stages < 2 || stages > 512) {
+    throw new Error('无效的目标 MNA 阶数');
+  }
+  return makeReactiveLadderScaled(stages, { kind, frequency, peakVoltage });
+}
+
+function makeReactiveLadderScaled(stages, {
   kind = 'rlc', frequency = 25, peakVoltage = 5,
 } = {}) {
-  if (!validCount(stages) || !['rc', 'rl', 'rlc'].includes(kind) ||
+  if (!validCount(stages, 512) || !['rc', 'rl', 'rlc'].includes(kind) ||
       !Number.isFinite(frequency) || frequency <= 0 ||
       !Number.isFinite(peakVoltage) || peakVoltage <= 0) {
     throw new Error('无效的多级反应网络参数');

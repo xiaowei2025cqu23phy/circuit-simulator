@@ -150,10 +150,6 @@ node research/round8-evidence-snapshot/bench_workspace/scripts/benchmark-mna-sca
 
 整包原始 Node22 CSV 与复现批次在 `research/round8-evidence-snapshot/`，独立 PWL 电路研究原始 CSV 在工作树 `research/` 内。对照材料里的基准与当前第九轮性能结果时，保留平台分层，不合并毫秒数。
 
----
-
-[![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
-
 
 ## 十、独立复核新增：物理二极管电流约束不能由迟滞状态一致性替代
 
@@ -169,3 +165,68 @@ node research/round8-evidence-snapshot/bench_workspace/scripts/benchmark-mna-sca
 3. 与物理二极管、实测波形或独立 SPICE 模型的外部真实性。
 
 第三层尚未完成，不能因为第一层数值残量很小就视为第三层已证实。详见 docs/hsp-mna-round9-multitopology-followup.md。
+
+---
+
+## 十一、接手后的原生 Node 复核与新增结论（2026-10-30）
+
+本轮在本机原生 Node v26.8.1 上重跑最新提交，补齐了前面"尚未运行"的项目，并独立复核了上节结论。以下为可追溯的新证据，不覆盖前十节的判断。
+
+### 11.1 新增已证实项
+
+1. **工程命令**：`npm ci`、`npm test`（76/76）、`npm run lint`、`npm run build` 在最新提交上全部通过，日志在 `research/round9-npm-test.log` 等。
+2. **反向 ON 电流是模型性质而非求解错误**：独立重写 MNA 装配与高斯消元后，最负样本处与引擎解的最大差为 5.55e−17（轻载）/1.69e−14（重载），独立残差 ≤1.42e−14。脚本 `scripts/verify-pwl-reverse-current.mjs`，数据 `research/round9-pwl-reverse-current-independent.csv`。
+3. **128/256 阶真实器件网络可运行**：63 支二极管在 128 阶同步切换、127 支在 256 阶同步切换，`unresolved_steps=0`，KCL 残量 ≤2.27e−11 A、KVL 残量 ≤3.34e−13 V（已按量纲分离）。
+4. **减少完整求逆不等于加速**：32 个电路场景中 rank-one 仅在 3 个快于 LU，27 个以 LU 最快；256 阶重负载二极管网络中 rank-one 把完整求逆从 21 次降到 9 次，但耗时约为 LU 的 1.88 倍。这是对"低秩更新带来普遍速度优势"的直接反例。
+
+### 11.2 新增必须修订项：研究模式与基线不是同一器件模型
+
+上一节只指出"ON 支路允许反向电流"。接手后把 legacy `iterative` 基线一并测量后得到更强结论：
+
+| 状态算法 | 轻载负电流样本 | 重载负电流样本 | 最小 ON 电流 |
+|---|---:|---:|---:|
+| iterative（默认基线） | 0 / 1250 | 0 / 1512 | +3.59e−6 A / +9.52e−3 A |
+| hysteretic-corrected（研究模式） | 1670 / 3180 | 320 / 1832 | −8.27e−3 A / −0.994 A |
+
+即：legacy 基线用 `i_D < −1 µA` 释放规则**事实上维持了单向导通**，而 predicted/guarded/adaptive/hysteretic-corrected 四种研究模式只检查电压迟滞，**允许 ON 支路反向导通**。因此：
+
+- 论文第三轮附录"A.1 说明 iterative 判据不同，故不纳入同模型精度结论"是正确且必要的，但**理由需要加强**：差异不止是状态时序判据，而是 ON 支路是否单向导电这一器件行为差异。
+- 任何"研究模式 vs iterative"的波形比较都同时改变了（i）状态切换时刻与（ii）电流容许性，不能把差异单独归因于预测/校正时序。
+- 第四至第七轮所有在 hysteretic-corrected 等研究模式下得到的 PWL 波形，其"二极管"在 0.65–0.70 V 区间是双向导电元件。作为**同一 PWL 模型的内部对照**仍然有效；作为**物理二极管精度**主张无效。
+- 论文正文、附录 G、以及第八轮梗概中"二极管状态一致性"相关表述，均应补充"状态一致 ≠ 电流方向一致"。
+
+### 11.3 论文结论的具体修订清单
+
+| 位置 | 现状 | 建议 |
+|---|---|---|
+| 第三轮附录 A.1 | 说 iterative 判据不同 | 加一句：还差在 ON 支路电流可正可负，基线有反向电流释放、研究模式没有 |
+| 附录 G / 第六轮 F.5 | "端点校正保持状态一致性" | 限定为"迟滞电压状态机自洽"，并明示 ON 反向电流仍可能存在 |
+| 第八轮摘要与结论 | 性能由维数/RHS 复用决定 | 增补：完整瞬态中 LU 在 27/32 场景最快；rank-one 减少求逆但 256 阶重负载慢 1.88 倍 |
+| 主文 6.x 单节点算例 | PWL 二极管"允许负电流"已有免责声明（第 5 页 §3.2） | 该声明方向正确，建议在结果表附近再重复一次，并给出本审计算出的量级（−1 A 上限） |
+| 全文"PWL 器件"措辞 | 部分段落接近物理器件语气 | 统一为"教学级两态 PWL 宏模型"，并声明不具备单向导电性 |
+| 数据可用性 | 第八轮 Python 单节点脚本/结果仍缺失 | 投稿前补齐或删除相应可复现性主张 |
+
+### 11.4 关于 EJP / Physics Education 投稿的评估
+
+以目前证据判断：**尚不足以支撑向 European Journal of Physics 或 Physics Education 投稿。** 理由：
+
+1. 这两类期刊要求物理正确性与教学价值。当前 ON 支路允许反向电流，作为"二极管"呈现会在审稿中被直接挑战；而修改器件模型会使前八轮全部 PWL 数据失效，需重跑。
+2. 缺少任何学习成效/课堂使用数据（EJP/Physics Education 的核心评价维度之一）。
+3. 缺少与真实器件或 ngspice 的物理对照；细网格 PWL 参考只能证明数值一致性。
+4. 性能部分是合成/教学规模内核计时，与本刊读者关心的物理教学结论关联弱。
+
+更现实的路径：先面向**工程/教育软件工具类**会议或期刊（强调可复现实现、失败边界与教学用途），同时完成（a）引入单向导电的互补 PWL 或连续模型并重跑关键误差表，（b）ngspice 直流/瞬态对照，（c）一项小规模课堂可用性评估。在此之前，论文应保持"方法研究稿"定位。
+
+### 11.5 复现命令
+
+```bash
+npm ci && npm test && npm run lint && npm run build
+npm run benchmark:hsp:topologies > research/round9-multitopology-node.csv
+npm run benchmark:hsp:large -- --sizes=64,96,128,256 --repetitions=3 > research/round9-large-mna-node.csv
+node scripts/inspect-pwl-current-direction.mjs > research/round9-pwl-reverse-current-node.csv
+npm run verify:pwl-current > research/round9-pwl-reverse-current-independent.csv
+```
+
+---
+
+[![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)

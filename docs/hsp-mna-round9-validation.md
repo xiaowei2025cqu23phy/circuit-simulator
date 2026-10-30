@@ -139,3 +139,26 @@ npm run benchmark:hsp:secant
 - 已将测试文件中的重复坐标键工具函数改为从引擎 `engine.js` 直接导入 `ptToStr`，防止测试副本与生产函数未来漂移；**该后续改动尚没有新的完整 Node npm test/lint/build 日志**，原有存档 67/67 日志对应修复前的第九轮验证提交，不应写成新提交已通过。
 - 已更正桥式整流 rank-one 计数（成功秩一更新 8 次、自动安全回退 4 次），以及完整测试日志的总耗时。
 - 此次独立 GitHub 审查可交叉核对 PR diff 和 CSV，但不能代替在用户本机执行 Node 环境命令。请在本地新提交 HEAD 再运行完整命令并保存日志。
+
+## 10. 最新提交的原生 Node 复核（2026-10-30，本轮补齐）
+
+第 9 节遗留的"新提交尚未在原生 Node 运行"已在本轮补齐。起点 `06025ac`（快进合并，工作区干净），环境 Node v26.8.1 / npm 11.19.0 / Windows 11 / Ryzen 5 7520U。
+
+| 命令 | 实际结果 |
+|---|---|
+| `npm ci` | 通过，244 packages（11 项依赖审计告警） |
+| `npm test` | **76/76 通过**（原有 74 项 + 本轮新增 2 项加固测试） |
+| `npm run lint` | 通过 |
+| `npm run build` | 通过，1728 modules，gzip 87.39 kB |
+| `npm run benchmark:hsp:topologies` | 45 行输出，`research/round9-multitopology-node.csv` |
+| `npm run benchmark:hsp:large` | 51 行，64/96/128/256 阶，`research/round9-large-mna-node.csv` |
+| `node scripts/inspect-pwl-current-direction.mjs` | 4 行，两求解器对照 |
+| `npm run verify:pwl-current` | 独立求解复核，2 行 |
+
+新增结论（详见 [多拓扑后续报告](hsp-mna-round9-multitopology-followup.md) 与 [论文一致性审查](hsp-mna-paper-code-consistency-review.md) 第十一节）：
+
+1. 修复 `mnaResidual.js` 两处缺陷：KCL（安培）与 KVL（伏特）残量未分离；空历史对象被静默当作零历史。修复后新增回归测试，并顺带定位首步 `NaN` 残量缺陷。
+2. 真实器件网络扩展到 256 阶：127 支二极管可同步切换，`unresolved_steps=0`，KCL ≤2.27e−11 A、KVL ≤3.34e−13 V。
+3. **性能负结果**：32 个场景中 rank-one 只有 3 个快于 LU；256 阶重负载网络中完整求逆 21→9 次但耗时约为 LU 的 1.88 倍。减少求逆次数不等于加速。
+4. **模型负结果强化**：legacy `iterative` 基线 0 个负 ON 电流样本（最小 +3.59 µA / +9.52 mA），研究模式有 1670/3180 与 320/1832 个负样本（最小 −8.27 mA / −0.994 A）。研究模式与基线不是同一器件模型。
+5. 独立重写 MNA 装配与高斯消元验证：负电流与引擎解的差 ≤1.69e−14，确认是模型定义而非求解器缺陷。
