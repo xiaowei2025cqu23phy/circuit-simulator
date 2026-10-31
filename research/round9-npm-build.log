@@ -10,14 +10,8 @@ Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:
 transforming...✓ 1728 modules transformed.
 rendering chunks...
 computing gzip size...
-dist/index.html                   0.82 kB │ gzip:  0.55 kB
-dist/assets/index-BzyQWl5J.css   22.77 kB │ gzip:  5.02 kB
-dist/assets/index-RhUDlJ9p.js   275.89 kB │ gzip: 87.39 kB
+dist/index.html                   0.82 kB │ gzip:  0.54 kB
+dist/assets/index-kComyYMh.css   22.80 kB │ gzip:  5.03 kB
+dist/assets/index-2RYox7me.js   276.74 kB │ gzip: 87.69 kB
 
-[PLUGIN_TIMINGS] Warning: Your build spent significant time in plugins. Here is a breakdown:
-  - vite:css (39%)
-  - vite:build-html (32%)
-  - rolldown:vite-resolve (26%)
-See https://rolldown.rs/options/checks#plugintimings for more details.
-
-✓ built in 5.47s
+✓ built in 2.68s

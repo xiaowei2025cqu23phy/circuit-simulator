@@ -1,0 +1,5 @@
+load_profile,diodes,model,negative_on_samples,on_samples,min_on_current_a,state_changes,nonconverged_steps,solves
+light,4,A_hysteretic_pwl,1670,3180,-8.271209e-3,4,0,801
+light,4,B_unidirectional_pwl,0,1250,3.593308e-6,16,0,811
+heavy,4,A_hysteretic_pwl,320,1832,-9.942428e-1,16,0,808
+heavy,4,B_unidirectional_pwl,0,1512,9.520424e-3,16,0,804

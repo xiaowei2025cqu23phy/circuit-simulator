@@ -259,6 +259,12 @@ export function compileCircuit(els, dt = DEFAULT_DT, options = {}) {
   if (!Number.isFinite(correctionGuard) || correctionGuard < 0) throw new Error('校正容差必须为非负有限数');
   const adaptiveScale = options.adaptiveScale ?? 0.2;
   if (!Number.isFinite(adaptiveScale) || adaptiveScale <= 0) throw new Error('自适应电压尺度必须大于零');
+  // Research-only phase instrumentation. Off by default so the shipped solver
+  // keeps its exact timestep path; every measurement below is guarded.
+  const recordTiming = options.recordTiming === true;
+  if (options.recordTiming !== undefined && typeof options.recordTiming !== 'boolean') {
+    throw new Error('recordTiming 选项必须为布尔值');
+  }
   const dsu = new DSU();
   let hasGround = false;
   const labelsByText = {};
@@ -396,6 +402,13 @@ export function compileCircuit(els, dt = DEFAULT_DT, options = {}) {
     state: {}, history: [], currentNodes: {}, allEls: engineEls, switchStates,
     needsMatrixRebuild: false, lastMeasured: null, lastUiTime: 0,
     diodeSolver, correctionGuard, adaptiveScale, previousSolution: null,
+    recordTiming,
+    timing: recordTiming ? {
+      matrixRebuildMs: 0, factorizeMs: 0, rankOneUpdateMs: 0,
+      rhsAssemblyMs: 0, rhsSolveMs: 0,
+      factorizations: 0, rankOneAttempts: 0, rankOneUpdates: 0,
+      rankOneCapSkips: 0, rankOneFailures: 0, linearSolves: 0,
+    } : null,
     diagnostics: { steps: 0, linearSolves: 0, matrixRebuilds: 0, stateDisagreements: 0, unresolvedSteps: 0,
       stateCorrections: 0, stepsWithCorrections: 0, adaptiveTightenedSteps: 0,
       factorizations: 1, alignedTimeEvents: 0, rankOneUpdates: 0, rankOneFallbacks: 0 },
@@ -422,33 +435,45 @@ export function stepEngine(eng, probeId = null) {
   // 2) 求解 + 二极管状态定点迭代
   //    求解后检查二极管压降，若状态应改变则重建矩阵重新求解（最多 12 次），
   //    使二极管通断在本步内收敛，避免"一步延迟"造成的伪尖峰。
+  const timing = eng.timing;
   const assembleAndSolve = () => {
     if (eng.needsMatrixRebuild) {
+      const rebuildStart = timing ? performance.now() : 0;
       let reused = false;
       if (eng.linearSolver === 'inverse-rank1' && eng.factorDt === dt) {
         const changed = validEls.filter(el => el.type === 'diode' || el.type === 'switch')
           .filter(el => Boolean(eng.factorStates[el.id]) !== Boolean(switchStates[el.id]));
         const onlyDiodes = changed.length > 0 && changed.every(el => el.type === 'diode');
-        if (onlyDiodes && eng.rankOneSinceFull + changed.length <= eng.maxRankOneUpdates) {
-          let nextInverse = eng.A_inv;
-          for (const el of changed) {
-            const nextG = switchStates[el.id] ? 20 : 1e-8;
-            const oldG = eng.factorStates[el.id] ? 20 : 1e-8;
-            nextInverse = updateInverseForConductanceBranch(nextInverse, el.n1, el.n2, nextG - oldG,
-              { relativeDenominatorFloor: eng.rankOneDenominatorFloor });
-            if (!nextInverse) break;
-          }
-          if (nextInverse) {
-            eng.A_inv = nextInverse;
-            eng.rankOneSinceFull += changed.length;
-            eng.diagnostics.rankOneUpdates += changed.length;
-            reused = true;
-          } else {
-            eng.diagnostics.rankOneFallbacks += 1;
+        if (onlyDiodes) {
+          if (eng.rankOneSinceFull + changed.length <= eng.maxRankOneUpdates) {
+            if (timing) timing.rankOneAttempts += changed.length;
+            const updateStart = timing ? performance.now() : 0;
+            let nextInverse = eng.A_inv;
+            for (const el of changed) {
+              const nextG = switchStates[el.id] ? 20 : 1e-8;
+              const oldG = eng.factorStates[el.id] ? 20 : 1e-8;
+              nextInverse = updateInverseForConductanceBranch(nextInverse, el.n1, el.n2, nextG - oldG,
+                { relativeDenominatorFloor: eng.rankOneDenominatorFloor });
+              if (!nextInverse) break;
+            }
+            if (timing) timing.rankOneUpdateMs += performance.now() - updateStart;
+            if (nextInverse) {
+              eng.A_inv = nextInverse;
+              eng.rankOneSinceFull += changed.length;
+              eng.diagnostics.rankOneUpdates += changed.length;
+              if (timing) timing.rankOneUpdates += changed.length;
+              reused = true;
+            } else {
+              eng.diagnostics.rankOneFallbacks += 1;
+              if (timing) timing.rankOneFailures += 1;
+            }
+          } else if (timing) {
+            timing.rankOneCapSkips += changed.length;
           }
         }
       }
       if (!reused) {
+        const factorStart = timing ? performance.now() : 0;
         const A_new = buildMNA(eng.N, eng.M, dt, validEls, eng.branchEls, switchStates);
         if (eng.linearSolver === 'lu') {
           const factors = factorizeLU(A_new);
@@ -461,12 +486,18 @@ export function stepEngine(eng, probeId = null) {
         }
         eng.diagnostics.factorizations += 1;
         eng.rankOneSinceFull = 0;
+        if (timing) {
+          timing.factorizeMs += performance.now() - factorStart;
+          timing.factorizations += 1;
+        }
       }
       eng.factorStates = { ...switchStates };
       eng.factorDt = dt;
       eng.diagnostics.matrixRebuilds += 1;
       eng.needsMatrixRebuild = false;
+      if (timing) timing.matrixRebuildMs += performance.now() - rebuildStart;
     }
+    const rhsStart = timing ? performance.now() : 0;
     const b = Array(size).fill(0);
     validEls.forEach(el => {
       const { id, n1, n2, type, value } = el;
@@ -488,6 +519,7 @@ export function stepEngine(eng, probeId = null) {
         if (n2 >= 0) b[n2] -= ieq;
       }
     });
+    const solveStart = timing ? performance.now() : 0;
     // Reuse whichever matrix factorization belongs to the current PWL state.
     let x;
     if (eng.linearSolver === 'lu') {
@@ -499,6 +531,11 @@ export function stepEngine(eng, probeId = null) {
         for (let j = 0; j < size; j++) sum += eng.A_inv[i][j] * b[j];
         x[i] = sum;
       }
+    }
+    if (timing) {
+      timing.rhsAssemblyMs += solveStart - rhsStart;
+      timing.rhsSolveMs += performance.now() - solveStart;
+      timing.linearSolves += 1;
     }
     eng.diagnostics.linearSolves += 1;
     return x;

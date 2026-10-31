@@ -22,30 +22,47 @@ export function acceptedMnaResidual(eng, stateBeforeStep) {
   if (eng.sourceSampling !== 'be-end') {
     throw new Error('MNA 残量检验要求 BE 终点源采样');
   }
+  if (!Number.isFinite(eng.dt) || eng.dt <= 0) {
+    throw new Error('残量检验要求有效时间步长');
+  }
+  if (!Number.isInteger(eng.N) || !Number.isInteger(eng.M) ||
+      !Number.isInteger(eng.size) || eng.size !== eng.N + eng.M) {
+    throw new Error('残量检验要求有效 MNA 维数');
+  }
+  if (!Array.isArray(eng.validEls) || !Array.isArray(eng.branchEls) ||
+      !eng.branchMap || typeof eng.branchMap !== 'object') {
+    throw new Error('残量检验要求已编译的电路引擎');
+  }
   if (!stateBeforeStep || typeof stateBeforeStep !== 'object' || Array.isArray(stateBeforeStep)) {
     throw new Error('残量检验需要求解前动态历史状态及已接受解');
   }
   if (!Array.isArray(eng.previousSolution) || eng.previousSolution.length !== eng.size) {
     throw new Error('残量检验需要求解前动态历史状态及已接受解');
   }
+  if (!eng.previousSolution.every(isFiniteNumber)) {
+    throw new Error('残量检验的已接受解包含非有限值');
+  }
   // Every dynamic element must supply its own pre-step history. A partially
   // filled object would silently act as a zero history and produce a
   // plausible but meaningless residual, so reject it instead of guessing.
-  // During the very first accepted step the initial-condition history is
-  // zero by definition, so an empty object is the correct capture there.
+  // Two legitimate cases have no history at all:
+  //   1. the circuit contains no capacitor/inductor (pure resistive network);
+  //   2. the very first accepted step, where the initial condition is zero.
   const dynamicIds = eng.validEls
     .filter(el => el.type === 'capacitor' || el.type === 'inductor')
     .map(el => el.id);
-  const present = dynamicIds.filter(id => stateBeforeStep[id] !== undefined);
-  if (present.length !== 0 && present.length !== dynamicIds.length) {
-    throw new Error('残量检验动态元件历史状态不完整');
-  }
-  if (present.length === 0 && eng.diagnostics.steps > 1) {
-    throw new Error('残量检验缺少动态元件历史状态');
-  }
-  for (const id of present) {
-    if (!isFiniteNumber(stateBeforeStep[id])) {
-      throw new Error('残量检验动态元件历史状态非有限: ' + id);
+  if (dynamicIds.length > 0) {
+    const present = dynamicIds.filter(id => stateBeforeStep[id] !== undefined);
+    if (present.length !== 0 && present.length !== dynamicIds.length) {
+      throw new Error('残量检验动态元件历史状态不完整');
+    }
+    if (present.length === 0 && eng.diagnostics.steps > 1) {
+      throw new Error('残量检验缺少动态元件历史状态');
+    }
+    for (const id of present) {
+      if (!isFiniteNumber(stateBeforeStep[id])) {
+        throw new Error('残量检验动态元件历史状态非有限: ' + id);
+      }
     }
   }
 
