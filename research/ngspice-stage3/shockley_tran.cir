@@ -1,0 +1,15 @@
+
+* canonical one-node RC-diode, Shockley device, backward Euler (gear order 1)
+V1 s 0 SIN(1 1 200)
+R1 s n 1k
+C1 n 0 1u ic=0
+D1 n 0 DSHOCK
+.model DSHOCK D(IS=1e-12 N=1.8 RS=0)
+.options method=gear maxord=1 reltol=1e-8 abstol=1e-14 vntol=1e-10 trtol=1e7
+.tran 1u 40m 0 1u uic
+.control
+run
+set wr_singlescale
+wrdata shockley_tran.txt v(n)
+.endc
+.end

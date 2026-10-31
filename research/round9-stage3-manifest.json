@@ -1,0 +1,299 @@
+{
+  "title": "HSP-MNA round 9 stage 3: residual fix, performance protocol, same-model and device-model comparisons",
+  "date": "2026-10-31",
+  "branch": "research/hsp-mna-local-validation",
+  "baseCommit": "1432cb4f3f5e898ef055178c76ea786481a72141",
+  "environment": {
+    "node": "v26.8.1",
+    "npm": "11.19.0",
+    "platform": "win32",
+    "arch": "x64",
+    "cpu": "AMD Ryzen 5 7520U with Radeon Graphics",
+    "cpuCount": 8,
+    "totalMemoryGiB": 15.24,
+    "ngspice": {
+      "version": "ngspice-47 (64-bit Windows portable build)",
+      "source": "https://downloads.sourceforge.net/project/ngspice/ng-spice-rework/47/ngspice-47_64.7z",
+      "executableSha256": "22D5CAE2BD32B2E39157A8D27BF457122F68285B72A9EBEFDF41551B628233AB",
+      "installedTo": "system temporary directory only; PATH unchanged"
+    }
+  },
+  "sourceFiles": {
+    "src/sim/engine.js": {
+      "gitBlob": "0fcd0e36527892b8d460df1a1cbdbd332bf30590",
+      "sha256": "826789952ca99c1b82397f6575e45ebba6f7a9225319786e794aa9748ae751de"
+    },
+    "src/sim/mnaResidual.js": {
+      "gitBlob": "d4c36f506947e4dac85a9c6b21748339d89a94b7",
+      "sha256": "569b8e94a04e3b30e6845acda739e83c9c847e51b4bf102c73aa72bd877e395f"
+    },
+    "src/sim/multiTopology.test.mjs": {
+      "gitBlob": "9885369f097dc85f5ca91be5523161ccf5f9457b",
+      "sha256": "5935eef3ccb8cc96ad7ecdcea8fa75a81602f51613da634f88e77fed922b79b6"
+    },
+    "src/sim/independentMna.js": {
+      "gitBlob": "5b54e5960d36e750ae1b4a8a0cf5b7e25582d570",
+      "sha256": "d0cb4414c7f331934c50b98a3866ac2ac0de9692b04f19a21207fb0b0d820184"
+    },
+    "src/sim/researchDiodeModels.js": {
+      "gitBlob": "4fa8db6c0fe8d27bcee1821619d9084cc4c2f5bb",
+      "sha256": "4771c8a0f398dec77b2ec4a6156f0e43b3e50a98e64043397553658c03e85ed2"
+    },
+    "src/sim/mnaResidual.test.mjs": {
+      "gitBlob": "fd7dac4f329cc7e105410e00fbc36fde8cbb53e6",
+      "sha256": "35bdd6951375719fa0cbaf49f22c40dd1caaf5875d14a984abe9db264da06725"
+    },
+    "src/sim/timing.test.mjs": {
+      "gitBlob": "7a970fc635ac6b671c18e936044eeb0f50510b53",
+      "sha256": "ffd99a24c82c4712510073a91aaa3fda4a6c8ef521c2ade2ee0768d23244c276"
+    },
+    "scripts/perf-probe.mjs": {
+      "gitBlob": "77417e952b3998104c31d4edef52f034c480280b",
+      "sha256": "9cf6eefa744acb5f25d39116f952d36a4166008c27510b7520c7eaf507d081e8"
+    },
+    "scripts/perf-aggregate.mjs": {
+      "gitBlob": "a517a261237e72cc11b9ea8c7a36530e540935e0",
+      "sha256": "cb77b8fb60371b9efd8bb346debe3630bfbb1faa82a425788f879a97de2f84b7"
+    },
+    "scripts/run-stage3-perf.ps1": {
+      "gitBlob": "945f980e8e8bc66749fe2e79bdc94c12218db0e2",
+      "sha256": "6557ebec95ac5e47570565440f9cd480f61055d037461d5bb57d133eaaadbc2c"
+    },
+    "scripts/compare-hsp-same-model.mjs": {
+      "gitBlob": "c30294fc4b47b6637ea984c9423c0cb0fd96b92a",
+      "sha256": "61cf2eef723a7ff72bc66265d5b3c28f4d697e71ff141b3811769bd91014e5ba"
+    },
+    "scripts/compare-diode-models.mjs": {
+      "gitBlob": "62007fd645fdcde1b21ec4678c449ffedf21cbe7",
+      "sha256": "6ba432b52c4766e28e335fe55436ac067f6c6ae63c3c3483998a20cb3036d2ae"
+    }
+  },
+  "artifacts": {
+    "research/round9-stage3-performance.csv": {
+      "sha256": "c13ed0a3636ff0cfc4538a470022a960c9f51a114a240cd7a0d54afbe951a494"
+    },
+    "research/round9-stage3-performance-summary.json": {
+      "sha256": "f2f7e5daafabac4ee6cf8ca7debc6de6145aba12c202c7ce3c4c8857396f5a34"
+    },
+    "research/round9-stage3-same-model.csv": {
+      "sha256": "b275cf1351889f30a10d885d134154a5b93b9a02527d2a7d71efd45b22cf0dcc"
+    },
+    "research/round9-stage3-diode-transient.csv": {
+      "sha256": "db411d82125984f0b50fb5489a82510a91e57f728ec66ac158d8850739b5d48c"
+    },
+    "research/round9-stage3-diode-dc.csv": {
+      "sha256": "bdb6cb359f5993de81afd00960353c24a8970e832a2dad152aa8da8c2ffe0c5f"
+    },
+    "research/round9-stage3-diode-reverse-current.csv": {
+      "sha256": "cc61f70889b350f99cb13831223eb11d6408f72bb042554e7a37d4377686cf41"
+    },
+    "docs/hsp-mna-round9-stage3-review.md": {
+      "sha256": "6ce488ef5a327e1134430aa5cdb7a2fdf6026b45746047c6bdf0c69550a75567"
+    }
+  },
+  "performanceProtocol": {
+    "batches": 3,
+    "repetitionsPerProcess": 3,
+    "warmupPerProcess": 1,
+    "independentProcesses": 99,
+    "randomSolverOrderPerCaseAndBatch": true,
+    "bootstrapRounds": 2000,
+    "bootstrapSeeded": true,
+    "cases": [
+      "rc-64",
+      "rc-256",
+      "light-96",
+      "light-128",
+      "light-256",
+      "heavy-12",
+      "heavy-24",
+      "heavy-64",
+      "heavy-128",
+      "heavy-256",
+      "timed-switch-24"
+    ],
+    "rawFiles": [
+      "heavy-128__inverse-rank1__b1.csv",
+      "heavy-128__inverse-rank1__b2.csv",
+      "heavy-128__inverse-rank1__b3.csv",
+      "heavy-128__inverse__b1.csv",
+      "heavy-128__inverse__b2.csv",
+      "heavy-128__inverse__b3.csv",
+      "heavy-128__lu__b1.csv",
+      "heavy-128__lu__b2.csv",
+      "heavy-128__lu__b3.csv",
+      "heavy-12__inverse-rank1__b1.csv",
+      "heavy-12__inverse-rank1__b2.csv",
+      "heavy-12__inverse-rank1__b3.csv",
+      "heavy-12__inverse__b1.csv",
+      "heavy-12__inverse__b2.csv",
+      "heavy-12__inverse__b3.csv",
+      "heavy-12__lu__b1.csv",
+      "heavy-12__lu__b2.csv",
+      "heavy-12__lu__b3.csv",
+      "heavy-24__inverse-rank1__b1.csv",
+      "heavy-24__inverse-rank1__b2.csv",
+      "heavy-24__inverse-rank1__b3.csv",
+      "heavy-24__inverse__b1.csv",
+      "heavy-24__inverse__b2.csv",
+      "heavy-24__inverse__b3.csv",
+      "heavy-24__lu__b1.csv",
+      "heavy-24__lu__b2.csv",
+      "heavy-24__lu__b3.csv",
+      "heavy-256__inverse-rank1__b1.csv",
+      "heavy-256__inverse-rank1__b2.csv",
+      "heavy-256__inverse-rank1__b3.csv",
+      "heavy-256__inverse__b1.csv",
+      "heavy-256__inverse__b2.csv",
+      "heavy-256__inverse__b3.csv",
+      "heavy-256__lu__b1.csv",
+      "heavy-256__lu__b2.csv",
+      "heavy-256__lu__b3.csv",
+      "heavy-64__inverse-rank1__b1.csv",
+      "heavy-64__inverse-rank1__b2.csv",
+      "heavy-64__inverse-rank1__b3.csv",
+      "heavy-64__inverse__b1.csv",
+      "heavy-64__inverse__b2.csv",
+      "heavy-64__inverse__b3.csv",
+      "heavy-64__lu__b1.csv",
+      "heavy-64__lu__b2.csv",
+      "heavy-64__lu__b3.csv",
+      "light-128__inverse-rank1__b1.csv",
+      "light-128__inverse-rank1__b2.csv",
+      "light-128__inverse-rank1__b3.csv",
+      "light-128__inverse__b1.csv",
+      "light-128__inverse__b2.csv",
+      "light-128__inverse__b3.csv",
+      "light-128__lu__b1.csv",
+      "light-128__lu__b2.csv",
+      "light-128__lu__b3.csv",
+      "light-256__inverse-rank1__b1.csv",
+      "light-256__inverse-rank1__b2.csv",
+      "light-256__inverse-rank1__b3.csv",
+      "light-256__inverse__b1.csv",
+      "light-256__inverse__b2.csv",
+      "light-256__inverse__b3.csv",
+      "light-256__lu__b1.csv",
+      "light-256__lu__b2.csv",
+      "light-256__lu__b3.csv",
+      "light-96__inverse-rank1__b1.csv",
+      "light-96__inverse-rank1__b2.csv",
+      "light-96__inverse-rank1__b3.csv",
+      "light-96__inverse__b1.csv",
+      "light-96__inverse__b2.csv",
+      "light-96__inverse__b3.csv",
+      "light-96__lu__b1.csv",
+      "light-96__lu__b2.csv",
+      "light-96__lu__b3.csv",
+      "order-manifest.csv",
+      "rc-256__inverse-rank1__b1.csv",
+      "rc-256__inverse-rank1__b2.csv",
+      "rc-256__inverse-rank1__b3.csv",
+      "rc-256__inverse__b1.csv",
+      "rc-256__inverse__b2.csv",
+      "rc-256__inverse__b3.csv",
+      "rc-256__lu__b1.csv",
+      "rc-256__lu__b2.csv",
+      "rc-256__lu__b3.csv",
+      "rc-64__inverse-rank1__b1.csv",
+      "rc-64__inverse-rank1__b2.csv",
+      "rc-64__inverse-rank1__b3.csv",
+      "rc-64__inverse__b1.csv",
+      "rc-64__inverse__b2.csv",
+      "rc-64__inverse__b3.csv",
+      "rc-64__lu__b1.csv",
+      "rc-64__lu__b2.csv",
+      "rc-64__lu__b3.csv",
+      "timed-switch-24__inverse-rank1__b1.csv",
+      "timed-switch-24__inverse-rank1__b2.csv",
+      "timed-switch-24__inverse-rank1__b3.csv",
+      "timed-switch-24__inverse__b1.csv",
+      "timed-switch-24__inverse__b2.csv",
+      "timed-switch-24__inverse__b3.csv",
+      "timed-switch-24__lu__b1.csv",
+      "timed-switch-24__lu__b2.csv",
+      "timed-switch-24__lu__b3.csv"
+    ]
+  },
+  "results": {
+    "tests": "86/86 native Node",
+    "lint": "pass",
+    "build": "pass",
+    "performance": {
+      "groups": 33,
+      "samples": 297,
+      "luFastest": 10,
+      "inconclusive": 1,
+      "rankOneFastest": 0,
+      "rankOneUsesZeroUpdates": [
+        "light-96",
+        "light-128",
+        "light-256"
+      ],
+      "heavy256": {
+        "inverse_ms": 3562.31,
+        "lu_ms": 976.63,
+        "rank1_ms": 2056.19,
+        "ratio": 2.105,
+        "ci95": [
+          1.977,
+          2.239
+        ]
+      }
+    },
+    "sameModel": {
+      "rows": 90,
+      "rectifier10us_rmse_mV": {
+        "predicted": 13.748,
+        "guarded": 13.749,
+        "adaptive": 13.747,
+        "corrected": 1.273,
+        "refined": 4.755
+      },
+      "bank24_10us_rmse_V": {
+        "predicted": 0.04484,
+        "guarded": 0.04484,
+        "adaptive": 0.04484,
+        "corrected": 0.000089,
+        "refined": 9.34e-9
+      }
+    },
+    "diodeModels": {
+      "engine_vs_independent_max_abs_v": 2.2e-16,
+      "shockley_vs_ngspice": {
+        "dt10us_rmse_v": 0.0011918,
+        "dt10us_max_v": 0.0024978,
+        "dt100us_rmse_v": 0.012163
+      },
+      "pwl_vs_shockley": {
+        "rmse_v": 0.25217,
+        "max_v": 0.41722,
+        "peak_pwl_v": 0.7001,
+        "peak_shockley_v": 0.9658
+      },
+      "unilateral_pwl_vs_shockley": {
+        "rmse_v": 0.16468,
+        "negative_on_samples": 0
+      },
+      "reverseCurrentBank": {
+        "hysteretic": {
+          "light_negative": 1670,
+          "heavy_negative": 320,
+          "min_A": [
+            -0.008271,
+            -0.9942
+          ]
+        },
+        "unilateral": {
+          "light_negative": 0,
+          "heavy_negative": 0,
+          "min_A": [
+            0.000003018,
+            0.00952
+          ]
+        }
+      }
+    }
+  },
+  "scope": "Dense native Node transient core with real device stamps plus a portable ngspice reference for the Shockley chain only. Not a sparse industrial MNA claim, not browser/UI timing, not a physical hardware measurement."
+}

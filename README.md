@@ -467,3 +467,40 @@ node scripts/rank-one-guard-ablation.mjs > guard_ablation.csv
 - 同一合成网络中三法残差最大约 1e−14；真正病态的桥式整流例应沿用第七轮的数值分母保护回退。
 
 复现脚本：**scripts/benchmark-mna-scaling.mjs**，命令 **npm run benchmark:hsp:scale**。详见 [第八轮方法与限制](docs/eighth-round-node-benchmark.md)、[原生 Node 数据](research/node22_mna_scaling_results.csv)、[右端数量敏感性表](research/node22_mna_rhs_sensitivity.csv)。真实系统全量 npm/test/lint/build 与 ngspice 物理对照仍待完成；本研究 PR 为 Draft，不合并 main。
+
+
+## 第九轮后续：多拓扑 MNA 与物理模型边界（验证分支）
+
+本节仅属于 research/hsp-mna-local-validation 验证分支及 Draft PR #2，不会更改 main 默认行为。新增的研究电路构造、线性残量检查及 benchmark 直接使用 compileCircuit / stepEngine：
+
+- src/sim/researchCircuits.js：轻/重负载并联 4/12/24 二极管网络，4/8/16 级 RC/RL/RLC 网络，以及面向 64/96/128/256 阶的 `makeLargeDiodeBank` / `makeLargeLadder`。
+- src/sim/mnaResidual.js：根据**求解前**电容电压与电感电流重建已接受 BE MNA 方程，**分别**返回 KCL（安培）与 KVL（伏特）残量，避免把两种量纲混进同一个范数。
+- src/sim/multiTopology.test.mjs：多二极管/电容/电感/定时开关缓存、残量量纲与大阶数网络的回归测试。
+- scripts/benchmark-multi-topology.mjs：真正的 Node.js 全瞬态内核计时，可运行 npm run benchmark:hsp:topologies。
+- scripts/benchmark-large-mna.mjs：64/96/128/256 阶真实器件网络计时，npm run benchmark:hsp:large。
+- scripts/inspect-pwl-current-direction.mjs：审查迟滞 PWL 宏模型中 ON 支路反向电流，并与 legacy `iterative` 基线对照。
+- scripts/verify-pwl-reverse-current.mjs：独立重写 MNA 装配与高斯消元，复核反向电流不是求解器缺陷。
+
+**原生 Node 执行证据（本机 Node v26.8.1 / Windows 11 / Ryzen 5 7520U）：** npm test **76/76 通过**、lint 通过、build 通过。多拓扑 45 行：MNA 未知量最大差 1.47e−11（电压与支路电流混合单位），KCL 残量 ≤2.28e−11 A，KVL 残量 ≤1.95e−14 V，24 支二极管可同一步切换。大电路扩展到 256 阶：127 支二极管同步切换，KCL ≤2.27e−11 A、KVL ≤3.34e−13 V，无未收敛步。
+
+**关键负结果一（性能）：** 减少完整求逆次数不等于加速。32 个电路场景中 rank-one 只有 3 个快于 LU，27 个以 LU 最快；256 阶重负载二极管网络里 rank-one 把完整求逆从 21 次降到 9 次，耗时却约为 LU 的 1.88 倍。
+
+**关键负结果二（器件模型）：** 0.70/0.65 V 迟滞区允许 ON 支路最多约 −1 A 反向电流。legacy `iterative` 基线因有反向电流释放规则，实测 0 个负 ON 样本（最小 +3.59 µA / +9.52 mA）；四种研究模式分别有 1670/3180 与 320/1832 个负样本（最小 −8.27 mA / −0.994 A）。`stateDisagreements=0` 只代表迟滞电压判据自洽，不代表物理二极管单向导通。研究模式与基线因此不是同一器件模型，跨模式误差比较必须声明这一点。
+
+原始数值数据：research/round9-multitopology-v8-parity.csv、research/round9-pwl-reverse-current-v8.csv（隔离 V8）；research/round9-multitopology-node.csv、research/round9-large-mna-node.csv、research/round9-pwl-reverse-current-node.csv、research/round9-pwl-reverse-current-independent.csv（原生 Node）。详细报告：docs/hsp-mna-round9-multitopology-followup.md、docs/hsp-mna-paper-code-consistency-review.md。
+
+## 第九轮第三阶段：缺陷修复、性能协议与器件模型对照（验证分支）
+
+本节同样仅属于 research/hsp-mna-local-validation 分支与 Draft PR #2，默认应用行为不变。
+
+**修复的确定性缺陷：** `acceptedMnaResidual()` 对不含电容/电感的纯电阻网络在第二个时间步误报"缺少动态元件历史"。现已区分"电路无动态元件"与"历史漏传"，并新增参数校验（有效时间步长、维数、已接受解有限性）。`src/sim/mnaResidual.test.mjs` 6 项回归测试覆盖：无动态元件、电容-only、电感-only、混合、首步零初始条件、部分缺失、非有限值、非法参数，以及 KCL/KVL 量纲探针。
+
+**新增可选相位计时：** `compileCircuit(..., { recordTiming: true })` 默认关闭，累计矩阵重建/分解/秩一更新/RHS 组装/RHS 求解耗时。回归测试证明开启前后逐步 MNA 解逐位相同（`maxDifference === 0`）。
+
+**性能协议重做：** 每个 (电路, 求解器) 配置 3 个独立 Node 进程 × 每进程 3 次重复 × 1 次预热，随机化求解器顺序，记录每次重复的原始时间，bootstrap 95% CI。11 个场景 × 3 求解器 = 33 组、297 个样本（`research/perf-raw/`、`research/round9-stage3-performance.csv`）。结果：**LU 在 10 个场景显著更快，1 个不确定，inverse-rank1 从未最快**；256 阶重负载网络中秩一把完整求逆从 21 次降到 9 次但慢 2.1 倍（CI [1.98, 2.24]）。`light-96/128/256` 因单次切换数超过 `maxRankOneUpdates=32`，**成功秩一更新次数为 0**，不能作为秩一加速证据。机制：回退求逆（Gauss–Jordan）单次约为 LU 因子化的 5.5 倍，秩一更新每次分配整块 n×n 矩阵导致堆占用从 10.5 MB 升到 29.3 MB。
+
+**同器件模型算法比较：** 统一迟滞 PWL 法则下（剔除 iterative），rectifier 10 µs 预测 RMSE 13.75 mV vs 端点校正 1.27 mV；24 支重载网络预测 44.8 mV、15 mV guard 与预测相同（校正次数为 0）、端点校正 8.9e−5 V、加事件细分 9.3e−9 V。事件细分在 rectifier 10 µs 反而变差（4.76 mV），在 24 支网络改善 4 个数量级——收益依赖拓扑。
+
+**器件模型对照（含真实 ngspice 47 外部参考）：** 新增 `src/sim/researchDiodeModels.js`（单向 PWL 与 Shockley+Newton，与引擎不共享线性代数代码；独立实现复现引擎波形至 2.2e−16）。自写 Shockley 对 ngspice：10 µs RMSE 1.19 mV、100 µs 12.2 mV，呈 BE 一阶收敛；而研究 PWL 对 Shockley 的模型差为 RMSE 0.25 V、最大 0.42 V，**比数值离散误差大两个数量级**。单向 PWL 消除反向 ON 电流（−8.27 mA/−0.994 A → 0），但仍保留 0.16 V 的模型差。
+
+论文级报告与结论审查表：docs/hsp-mna-round9-stage3-review.md。原始数据与哈希：research/round9-stage3-*.csv、research/round9-stage3-manifest.json、research/ngspice-stage3/。

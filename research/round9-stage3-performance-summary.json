@@ -1,0 +1,259 @@
+{
+  "generatedAt": "2026-10-31T03:58:44.405Z",
+  "bootstrapRounds": 2000,
+  "cases": {
+    "heavy-128": {
+      "workload_class": "D_rank_one_plus_rebuild",
+      "rank_one_updates": 102,
+      "factorizations": {
+        "inverse": 21,
+        "lu": 21,
+        "rank1": 5
+      },
+      "median_ms": {
+        "inverse": 626.0306,
+        "lu": 271.097,
+        "rank1": 436.837
+      },
+      "rank1_over_lu": {
+        "point": 1.6113678867711558,
+        "ci95": [
+          1.4024727944193143,
+          1.7601125952962315
+        ],
+        "verdict": "LU faster (CI excludes 1)"
+      },
+      "lu_over_inverse": 0.4330411324941624
+    },
+    "heavy-12": {
+      "workload_class": "D_rank_one_plus_rebuild",
+      "rank_one_updates": 36,
+      "factorizations": {
+        "inverse": 19,
+        "lu": 19,
+        "rank1": 2
+      },
+      "median_ms": {
+        "inverse": 73.2835,
+        "lu": 54.7206,
+        "rank1": 66.9415
+      },
+      "rank1_over_lu": {
+        "point": 1.2233327119951172,
+        "ci95": [
+          1.0165794486246664,
+          1.6839122101923334
+        ],
+        "verdict": "LU faster (CI excludes 1)"
+      },
+      "lu_over_inverse": 0.7466974148341713
+    },
+    "heavy-24": {
+      "workload_class": "D_rank_one_plus_rebuild",
+      "rank_one_updates": 68,
+      "factorizations": {
+        "inverse": 21,
+        "lu": 21,
+        "rank1": 3
+      },
+      "median_ms": {
+        "inverse": 130.1439,
+        "lu": 91.253,
+        "rank1": 114.0752
+      },
+      "rank1_over_lu": {
+        "point": 1.2500980789672669,
+        "ci95": [
+          1.1295988658667664,
+          1.6188979374381613
+        ],
+        "verdict": "LU faster (CI excludes 1)"
+      },
+      "lu_over_inverse": 0.7011700125783844
+    },
+    "heavy-256": {
+      "workload_class": "D_rank_one_plus_rebuild",
+      "rank_one_updates": 136,
+      "factorizations": {
+        "inverse": 21,
+        "lu": 21,
+        "rank1": 9
+      },
+      "median_ms": {
+        "inverse": 3562.3093,
+        "lu": 976.6333,
+        "rank1": 2056.1871
+      },
+      "rank1_over_lu": {
+        "point": 2.1053829518202996,
+        "ci95": [
+          1.9772590633238807,
+          2.2387870113533572
+        ],
+        "verdict": "LU faster (CI excludes 1)"
+      },
+      "lu_over_inverse": 0.27415735629693916
+    },
+    "heavy-64": {
+      "workload_class": "D_rank_one_plus_rebuild",
+      "rank_one_updates": 90,
+      "factorizations": {
+        "inverse": 21,
+        "lu": 21,
+        "rank1": 3
+      },
+      "median_ms": {
+        "inverse": 169.2189,
+        "lu": 118.9582,
+        "rank1": 179.5777
+      },
+      "rank1_over_lu": {
+        "point": 1.5095865606574408,
+        "ci95": [
+          1.2031687460898741,
+          1.595583502954951
+        ],
+        "verdict": "LU faster (CI excludes 1)"
+      },
+      "lu_over_inverse": 0.7029841229318948
+    },
+    "light-128": {
+      "workload_class": "B_state_change_cap_skipped",
+      "rank_one_updates": 0,
+      "factorizations": {
+        "inverse": 2,
+        "lu": 2,
+        "rank1": 2
+      },
+      "median_ms": {
+        "inverse": 262.8444,
+        "lu": 223.1916,
+        "rank1": 251.5368
+      },
+      "rank1_over_lu": {
+        "point": 1.1269994032033464,
+        "ci95": [
+          1.0446963198345225,
+          1.3402756401405942
+        ],
+        "verdict": "LU faster (CI excludes 1)"
+      },
+      "lu_over_inverse": 0.8491396430740011
+    },
+    "light-256": {
+      "workload_class": "B_state_change_cap_skipped",
+      "rank_one_updates": 0,
+      "factorizations": {
+        "inverse": 2,
+        "lu": 2,
+        "rank1": 2
+      },
+      "median_ms": {
+        "inverse": 673.9985,
+        "lu": 506.0361,
+        "rank1": 686.8605
+      },
+      "rank1_over_lu": {
+        "point": 1.3573349806466377,
+        "ci95": [
+          1.1441555674640012,
+          1.580094779799307
+        ],
+        "verdict": "LU faster (CI excludes 1)"
+      },
+      "lu_over_inverse": 0.7507970715068356
+    },
+    "light-96": {
+      "workload_class": "B_state_change_cap_skipped",
+      "rank_one_updates": 0,
+      "factorizations": {
+        "inverse": 2,
+        "lu": 2,
+        "rank1": 2
+      },
+      "median_ms": {
+        "inverse": 180.3975,
+        "lu": 165.6288,
+        "rank1": 199.1381
+      },
+      "rank1_over_lu": {
+        "point": 1.2023156600784404,
+        "ci95": [
+          1.0414505989246186,
+          1.2681478594736024
+        ],
+        "verdict": "LU faster (CI excludes 1)"
+      },
+      "lu_over_inverse": 0.9181324574897103
+    },
+    "rc-256": {
+      "workload_class": "A_no_state_change",
+      "rank_one_updates": 0,
+      "factorizations": {
+        "inverse": 1,
+        "lu": 1,
+        "rank1": 1
+      },
+      "median_ms": {
+        "inverse": 596.3006,
+        "lu": 533.7094,
+        "rank1": 581.6806
+      },
+      "rank1_over_lu": {
+        "point": 1.0898826215165034,
+        "ci95": [
+          0.9949788160952812,
+          1.1452804042174485
+        ],
+        "verdict": "inconclusive (CI includes 1)"
+      },
+      "lu_over_inverse": 0.8950341488839688
+    },
+    "rc-64": {
+      "workload_class": "A_no_state_change",
+      "rank_one_updates": 0,
+      "factorizations": {
+        "inverse": 1,
+        "lu": 1,
+        "rank1": 1
+      },
+      "median_ms": {
+        "inverse": 159.342,
+        "lu": 126.0581,
+        "rank1": 156.2709
+      },
+      "rank1_over_lu": {
+        "point": 1.2396736108191382,
+        "ci95": [
+          1.1395207302008235,
+          1.309935384695718
+        ],
+        "verdict": "LU faster (CI excludes 1)"
+      },
+      "lu_over_inverse": 0.7911165919845363
+    },
+    "timed-switch-24": {
+      "workload_class": "F_timed_switch_rebuild",
+      "rank_one_updates": 24,
+      "factorizations": {
+        "inverse": 4,
+        "lu": 4,
+        "rank1": 3
+      },
+      "median_ms": {
+        "inverse": 124.3906,
+        "lu": 82.7482,
+        "rank1": 141.8922
+      },
+      "rank1_over_lu": {
+        "point": 1.7147466651842578,
+        "ci95": [
+          1.2997127504732595,
+          1.7715067624340017
+        ],
+        "verdict": "LU faster (CI excludes 1)"
+      },
+      "lu_over_inverse": 0.6652287230707143
+    }
+  }
+}

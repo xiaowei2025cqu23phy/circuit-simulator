@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { compileCircuit, stepEngine } from './engine.js';
+import { compileCircuit, stepEngine, ptToStr } from './engine.js';
 import { predictDiodeStates, countDiodeStateDisagreements, adaptiveDiodeGuard } from './statePrediction.js';
 import { PREDEFINED_CIRCUITS } from './circuits.js';
 

@@ -1,0 +1,5 @@
+diode_solver,load_profile,diodes,nominal_steps,on_state_samples,negative_on_state_samples,min_on_state_current_a,total_diode_transitions,state_disagreements,unresolved_steps
+iterative,light,4,800,1250,0,0.00000359330766697,16,0,0
+iterative,heavy,4,800,1512,0,0.00952042371309,16,0,0
+hysteretic-corrected,light,4,800,3180,1670,-0.00827120888477,4,0,0
+hysteretic-corrected,heavy,4,800,1832,320,-0.994242826234,16,0,0
