@@ -27,7 +27,8 @@ import os from 'node:os';
 import { compileCircuit, stepEngine, ptToStr } from '../src/sim/engine.js';
 import {
   runStateModel, runShockleyModel,
-  pwlDcCurrent, shockleyDcCurrent, PWL_DEFAULTS, SHOCKLEY_DEFAULTS,
+  pwlDcCurrent, shockleyDcCurrent, PWL_DEFAULTS,
+  resolveShockley, pwlCalibrationAt, thermalVoltage,
 } from '../src/sim/researchDiodeModels.js';
 import { makeParallelDiodeBank } from '../src/sim/researchCircuits.js';
 
@@ -179,34 +180,28 @@ function interpolateAt(scale, values, target) {
   return values[lo] * (1 - w) + values[hi] * w;
 }
 
-const shockleyParams = { ...SHOCKLEY_DEFAULTS };
-// A PWL variant whose ON branch is calibrated to the Shockley diode at 1 mA:
-//   V_F = n*V_T*ln(I_ref/I_S + 1), R_on = n*V_T/I_ref, thresholds shifted by 50 mV.
-// This separates "wrong PWL parameters" from "PWL model form can never follow an
-// exponential". Both are reported; neither is presented as physical truth.
+const shockleyParams = resolveShockley();
+// Single-slope PWL calibrated to the Shockley diode at a chosen reference
+// current. The calibration solves the correct tangent conditions:
+//   g_ref = di/dv at (V_ref, I_ref) = (I_S + I_ref)/(n*V_T)
+//   V_0   = V_ref - I_ref/g_ref
+// The previous implementation used V_0 = V_ref, which delivers ZERO current at
+// the reference voltage; those results are archived as superseded.
 const I_REF = 1e-3;
-const nVt = shockleyParams.n * shockleyParams.vt;
-/** Single-slope PWL fitted to the Shockley diode at a chosen reference current. */
-function calibratedPwlAt(iRef) {
-  const vf = nVt * Math.log(iRef / shockleyParams.is + 1);
-  return {
-    vf,
-    gOn: 1 / (nVt / (iRef + shockleyParams.is)),
-    vOn: vf,
-    vOff: vf - 0.05,
-  };
-}
+const calibratedPwlAt = iRef => pwlCalibrationAt(iRef, shockleyParams);
 const calibratedPwl = calibratedPwlAt(I_REF);
 const calibratedPwlLow = calibratedPwlAt(1e-4);
+const ngspiceTemp = shockleyParams.temperatureK - 273.15; // 27 degC = 300.15 K
 const ngspiceCheck = ngspiceBin
   ? runNgspice('shockley_tran', `
 * canonical one-node RC-diode, Shockley device, backward Euler (gear order 1)
+* temperature pinned to the analytic model: 27 C = 300.15 K
 V1 s 0 SIN(1 1 200)
 R1 s n 1k
 C1 n 0 1u ic=0
 D1 n 0 DSHOCK
 .model DSHOCK D(IS=1e-12 N=1.8 RS=0)
-.options method=gear maxord=1 reltol=1e-8 abstol=1e-14 vntol=1e-10 trtol=1e7
+.options temp=${ngspiceTemp} method=gear maxord=1 reltol=1e-8 abstol=1e-14 vntol=1e-10 trtol=1e7
 .tran 1u 40m 0 1u uic
 .control
 run
@@ -271,6 +266,12 @@ for (const dt of dts) {
   const modelAcalLow = runStateModel(canonicalCircuit(), {
     dt, duration, rule: 'hysteretic', probe: NODE, params: calibratedPwlLow,
   });
+  // Calibrated branch, but the original 0.70/0.65 V state thresholds kept.
+  // This isolates "branch parameter calibration" from "threshold placement".
+  const modelAcalFixedThreshold = runStateModel(canonicalCircuit(), {
+    dt, duration, rule: 'hysteretic', probe: NODE,
+    params: { ...calibratedPwl, vOn: PWL_DEFAULTS.vOn, vOff: PWL_DEFAULTS.vOff },
+  });
   const modelB = runStateModel(canonicalCircuit(), { dt, duration, rule: 'unidirectional', probe: NODE });
   const modelC = runShockleyModel(canonicalCircuit(), { dt, duration, probe: NODE, params: shockleyParams });
   // Compare A/B/C on the common end-of-step grid (all use (k+1)*dt).
@@ -313,6 +314,7 @@ for (const dt of dts) {
   add('A_independent_hysteretic', modelA);
   add('A_calibrated_pwl', modelAcal);
   add('A_calibrated_pwl_low_current', modelAcalLow);
+  add('A_calibrated_branch_fixed_threshold', modelAcalFixedThreshold);
   add('B_unidirectional_pwl', modelB);
   add('C_shockley', modelC);
   // Cross-check: engine vs independent Model A must agree to solver accuracy.

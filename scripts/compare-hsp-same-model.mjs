@@ -84,19 +84,39 @@ function simulate(elements, probe, dt, mode, refinement) {
     stepOnce(handle);
     values[k] = handle.engine.currentNodes[ptToStr(probe)] ?? 0;
     if (k % 61 === 0 || k === steps - 1) {
-      const residual = acceptedMnaResidual(handle.engine, historyBefore);
+      // A refined nominal step is committed as the LAST accepted substep, so
+      // the residual must use that substep's real dt and starting history.
+      const segment = handle.engine.lastAcceptedSegment;
+      const residual = refinement && segment
+        ? acceptedMnaResidual(handle.engine, segment.historyBefore, { dt: segment.dt })
+        : acceptedMnaResidual(handle.engine, historyBefore);
       maxKcl = Math.max(maxKcl, residual.kclAbsolute);
       maxKvl = Math.max(maxKvl, residual.kvlAbsolute);
     }
   }
   const elapsed = performance.now() - begin;
   const d = handle.engine.diagnostics;
+  const accepted = d.linearSolves;
+  const rejected = d.eventRejectedSolves ?? 0;
+  const total = accepted + rejected;
+  // Audit: the monotonic work counter can never be rolled back, so it must
+  // equal accepted + rejected linear solves.
+  const accounting = handle.engine.work.solveCalls === total;
   return {
     values, elapsed, steps,
-    linearSolves: d.linearSolves, stateCorrections: d.stateCorrections,
+    acceptedLinearSolves: accepted,
+    rejectedTrialSolves: rejected,
+    totalLinearSolves: total,
+    accountingConsistent: accounting,
+    workSolveCalls: handle.engine.work.solveCalls,
+    acceptedFactorizations: d.factorizations,
+    rejectedFactorizations: d.eventRejectedFactorizations ?? 0,
+    stateCorrections: d.stateCorrections,
     stepsWithCorrections: d.stepsWithCorrections,
     stateDisagreements: d.stateDisagreements, adaptiveTightenedSteps: d.adaptiveTightenedSteps,
-    unresolvedSteps: d.unresolvedSteps, factorizations: d.factorizations,
+    unresolvedSteps: d.unresolvedSteps,
+    eventRejectedTrials: d.eventRejectedTrials ?? 0,
+    eventAcceptedSubsteps: d.eventAcceptedSubsteps ?? 0,
     maxKcl, maxKvl,
   };
 }
@@ -132,6 +152,10 @@ for (const scenario of scenarios) {
         const first = runs[0];
         const metrics = compare(first.values, reference, dt);
         const d = first;
+        if (!d.accountingConsistent) {
+          throw new Error(`solve accounting mismatch for ${scenario.name}/${mode}/${dt}: ` +
+            `work=${d.workSolveCalls} accepted=${d.acceptedLinearSolves} rejected=${d.rejectedTrialSolves}`);
+        }
         rows.push({
           circuit: scenario.name,
           device_law: 'hysteretic_pwl_0.70_0.65',
@@ -142,14 +166,22 @@ for (const scenario of scenarios) {
           rmse_v: metrics.rmse.toExponential(8),
           max_abs_error_v: metrics.max.toExponential(8),
           median_elapsed_ms: median(runs.map(r => r.elapsed)).toFixed(4),
-          linear_solves: d.linearSolves,
-          solves_per_step: (d.linearSolves / d.steps).toFixed(6),
+          accepted_linear_solves: d.acceptedLinearSolves,
+          rejected_trial_solves: d.rejectedTrialSolves,
+          total_linear_solves: d.totalLinearSolves,
+          accepted_work_per_step: (d.acceptedLinearSolves / d.steps).toFixed(6),
+          total_work_per_step: (d.totalLinearSolves / d.steps).toFixed(6),
+          work_solve_calls: d.workSolveCalls,
+          accounting_consistent: d.accountingConsistent,
+          accepted_factorizations: d.acceptedFactorizations,
+          rejected_trial_factorizations: d.rejectedFactorizations,
           state_corrections: d.stateCorrections,
           steps_with_corrections: d.stepsWithCorrections,
           state_disagreements: d.stateDisagreements,
           adaptive_tightened_steps: d.adaptiveTightenedSteps,
           unresolved_steps: d.unresolvedSteps,
-          factorizations: d.factorizations,
+          event_rejected_trials: d.eventRejectedTrials,
+          event_accepted_substeps: d.eventAcceptedSubsteps,
           max_kcl_residual_a: d.maxKcl.toExponential(6),
           max_kvl_residual_v: d.maxKvl.toExponential(6),
           node_version: process.version,

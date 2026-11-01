@@ -31,9 +31,67 @@ import { assembleLinear, solveDense, elementVoltage, maxRowResidual } from './in
 export const PWL_DEFAULTS = Object.freeze({
   gOn: 20, gOff: 1e-8, vf: 0.7, vOn: 0.7, vOff: 0.65,
 });
+// Physical constants (SI 2019 exact values).
+export const BOLTZMANN = 1.380649e-23;      // J/K
+export const ELEMENTARY_CHARGE = 1.602176634e-19; // C
+/** Thermal voltage kT/q at a temperature in kelvin. */
+export const thermalVoltage = temperatureK => BOLTZMANN * temperatureK / ELEMENTARY_CHARGE;
+// ngspice's default simulation temperature is 27 degC = 300.15 K, so the
+// reference implementation must use the SAME thermal voltage.
+export const NGSPICE_DEFAULT_TEMPERATURE_K = 300.15;
 export const SHOCKLEY_DEFAULTS = Object.freeze({
-  is: 1e-12, n: 1.8, vt: 0.025852, expLimit: 60,
+  is: 1e-12, n: 1.8, temperatureK: NGSPICE_DEFAULT_TEMPERATURE_K, expLimit: 60,
 });
+
+/**
+ * Resolve Shockley parameters. The thermal voltage is derived from the
+ * temperature unless an explicit `vt` is given (explicit vt is only for
+ * reproducing the superseded, temperature-mismatched measurements).
+ */
+export function resolveShockley(params = {}) {
+  const p = { ...SHOCKLEY_DEFAULTS, ...params };
+  const temperatureK = Number.isFinite(p.temperatureK) && p.temperatureK > 0
+    ? p.temperatureK : NGSPICE_DEFAULT_TEMPERATURE_K;
+  const vt = Number.isFinite(p.vt) && p.vt > 0 ? p.vt : thermalVoltage(temperatureK);
+  if (!Number.isFinite(p.is) || p.is <= 0) throw new Error('Shockley 饱和电流必须为正有限数');
+  if (!Number.isFinite(p.n) || p.n <= 0) throw new Error('Shockley 理想因子必须为正有限数');
+  return { is: p.is, n: p.n, temperatureK, vt, expLimit: p.expLimit };
+}
+
+/**
+ * Single-slope PWL branch that is tangent to the Shockley diode at
+ * (V_ref, I_ref):
+ *
+ *   i(v) = g_ref*(v - V0)
+ *   g_ref = di/dv at V_ref = (I_S + I_ref)/(n*V_T)
+ *   V0    = V_ref - I_ref/g_ref
+ *
+ * The previous implementation used V0 = V_ref, which yields i(V_ref)=0
+ * instead of I_ref (a 46 mV / order-one error at the reference point).
+ * Returns the branch parameters plus the reference check values.
+ */
+export function pwlCalibrationAt(iRef, params = {}) {
+  const p = resolveShockley(params);
+  if (!Number.isFinite(iRef) || iRef <= 0) throw new Error('标定参考电流必须为正有限数');
+  const nVt = p.n * p.vt;
+  const vRef = nVt * Math.log1p(iRef / p.is);
+  const gRef = (p.is + iRef) / nVt;
+  const v0 = vRef - iRef / gRef;
+  return {
+    vf: v0,
+    gOn: gRef,
+    vOn: v0,
+    vOff: v0 - 0.05,
+    vRef,
+    gRef,
+    iRef,
+    nVt,
+    /** Current delivered by the calibrated linear branch at v = vRef. */
+    checkCurrentAtVRef: gRef * (vRef - v0),
+    /** Slope check (must equal gRef for a linear branch). */
+    checkSlope: gRef,
+  };
+}
 
 function probeIndex(eng, point) {
   if (!point) return -1;
@@ -171,7 +229,8 @@ export function runShockleyModel(elements, {
   dt = 5e-5, duration = 0.04, params = {}, probe = null,
   maxNewtonIterations = 50, stepTolerance = 1e-12, residualTolerance = 1e-10,
 } = {}) {
-  const p = { ...SHOCKLEY_DEFAULTS, ...params };
+  const p = resolveShockley(params);
+  const nVt = p.n * p.vt;
   const eng = makeTopology(elements, dt);
   const steps = Math.round(duration / dt);
   const probeIdx = probeIndex(eng, probe);
@@ -186,12 +245,12 @@ export function runShockleyModel(elements, {
   let previousSolution = null;
 
   const diodeCurrent = vD => {
-    const arg = Math.min(vD / (p.n * p.vt), p.expLimit);
+    const arg = Math.min(vD / nVt, p.expLimit);
     return p.is * (Math.exp(arg) - 1);
   };
   const diodeConductance = vD => {
-    const arg = Math.min(vD / (p.n * p.vt), p.expLimit);
-    return (p.is / (p.n * p.vt)) * Math.exp(arg);
+    const arg = Math.min(vD / nVt, p.expLimit);
+    return (p.is / nVt) * Math.exp(arg);
   };
 
   for (let k = 0; k < steps; k++) {
@@ -278,8 +337,9 @@ export function pwlDcCurrent(vs, { rSeries = 1000, params = {} } = {}) {
 
 /** Analytic Shockley DC current for the same series circuit (monotone bisection). */
 export function shockleyDcCurrent(vs, { rSeries = 1000, params = {} } = {}) {
-  const p = { ...SHOCKLEY_DEFAULTS, ...params };
-  const f = (i, source) => i * rSeries + p.n * p.vt * Math.log1p(i / p.is) - source;
+  const p = resolveShockley(params);
+  const nVt = p.n * p.vt;
+  const f = (i, source) => i * rSeries + nVt * Math.log1p(i / p.is) - source;
   return vs.map(source => {
     let lo = 0, hi = Math.max(source / rSeries, 1e-12);
     for (let e = 0; e < 200 && f(hi, source) <= 0; e++) hi *= 2;

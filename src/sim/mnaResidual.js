@@ -18,11 +18,21 @@ import { buildMNA, getSourceValue } from './engine.js';
 
 const isFiniteNumber = value => typeof value === 'number' && Number.isFinite(value);
 
-export function acceptedMnaResidual(eng, stateBeforeStep) {
+/**
+ * @param eng compiled engine AFTER the accepted step
+ * @param stateBeforeStep dynamic history captured BEFORE the accepted step
+ * @param options.dt accepted step length in seconds. Defaults to eng.dt.
+ *   Event-refinement substeps are shorter than the nominal dt, so callers must
+ *   pass the REAL substep length together with the state captured at the start
+ *   of that substep. Using the nominal dt and whole-step history produces a
+ *   meaningless residual.
+ */
+export function acceptedMnaResidual(eng, stateBeforeStep, options = {}) {
+  const dt = options.dt ?? eng.dt;
   if (eng.sourceSampling !== 'be-end') {
     throw new Error('MNA 残量检验要求 BE 终点源采样');
   }
-  if (!Number.isFinite(eng.dt) || eng.dt <= 0) {
+  if (!Number.isFinite(dt) || dt <= 0) {
     throw new Error('残量检验要求有效时间步长');
   }
   if (!Number.isInteger(eng.N) || !Number.isInteger(eng.M) ||
@@ -66,10 +76,9 @@ export function acceptedMnaResidual(eng, stateBeforeStep) {
     }
   }
 
-  const A=buildMNA(eng.N, eng.M, eng.dt, eng.validEls,
+  const A=buildMNA(eng.N, eng.M, dt, eng.validEls,
     eng.branchEls, eng.switchStates);
   const b=Array(eng.size).fill(0);
-  const dt=eng.dt;
   // eng.t has already advanced to the END of the accepted BE step.
   for (const el of eng.validEls) {
     const {id,n1,n2,type,value}=el;

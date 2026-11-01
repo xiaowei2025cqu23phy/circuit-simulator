@@ -504,3 +504,22 @@ node scripts/rank-one-guard-ablation.mjs > guard_ablation.csv
 **器件模型对照（含真实 ngspice 47 外部参考）：** 新增 `src/sim/researchDiodeModels.js`（单向 PWL 与 Shockley+Newton，与引擎不共享线性代数代码；独立实现复现引擎波形至 2.2e−16）。自写 Shockley 对 ngspice：10 µs RMSE 1.19 mV、100 µs 12.2 mV，呈 BE 一阶收敛；而研究 PWL 对 Shockley 的模型差为 RMSE 0.25 V、最大 0.42 V，**比数值离散误差大两个数量级**。单向 PWL 消除反向 ON 电流（−8.27 mA/−0.994 A → 0），但仍保留 0.16 V 的模型差。
 
 论文级报告与结论审查表：docs/hsp-mna-round9-stage3-review.md。原始数据与哈希：research/round9-stage3-*.csv、research/round9-stage3-manifest.json、research/ngspice-stage3/。
+
+## 第九轮第三阶段整改（2026-11-01，独立复核后）
+
+第三方复核对第三阶段给出“暂不通过”。本轮不增加功能，只修复已确认缺陷、重跑被污染数据、撤回错误结论。八项问题全部处理：
+
+1. **PWL 标定公式**：旧式取 `V0 = V_ref` 导致参考点电流为 0；改为 `g_ref=(I_S+I_ref)/(nV_T)`、`V0=V_ref−I_ref/g_ref`。修正后参考点相对误差 ≤2.2e−15，并重跑 DC/瞬态/ngspice；旧“标定反而更差”结论撤回。
+2. **事件细分成本**：旧报告只计接受求解。24 支重负载网络 50 µs 实际为 940 接受 + 240 回滚 = **1180 次（+47.5%）**，不是 940（+17.5%）。引擎新增永不回滚的工作计数器与 `lastAcceptedSegment`，子步残量改用真实 `dt` 与进入子步前的历史。
+3. **状态迭代失败**：新增显式契约——回滚到最后求解状态、丢弃陈旧缓存、重解一次、标记 `lastStepConverged=false`；`maxStateIterations` 可强制触发失败路径（1–64，默认 12），6 项测试按最终状态独立重建方程验证 KCL/KVL <1e−8。
+4. **实验可重复性**：性能流程改为唯一 run id + 独立目录 + `metadata.json`（SHA/版本/参数/种子）+ 每进程单文件（拒绝覆盖/追加）；聚合端拒绝重复表头、重复键、不完整与 NaN 记录。
+5. **性能显著性**：改按独立进程聚类 bootstrap（3 进程 × 3 重复）。本机 7/11 场景 LU 显著更快、4/11 不确定、rank-one 从未显著更快；heavy-12 跨运行不稳定，撤回“10/11 显著”表述。
+6. **ngspice 温度**：统一 300.15 K 后 DC 最大差 4.77e−7 A → **3.29e−10 A**，此前“收敛容差”归因更正。
+7. **机制表述**：区分代码事实、计时观察与推测；不再把时间差直接归因 GC（未采集独立 GC 数据）。
+8. **归档**：旧数据移入 `research/round9-stage3-erratum/`（`_SUPERSEDED`），新证据在 `research/perf-runs/<runId>/` 与 `research/round9-stage3-*-corrected.*`。
+
+权威报告：[整改报告](docs/hsp-mna-round9-stage3-corrections.md)、[主报告勘误节](docs/hsp-mna-round9-stage3-review.md#13-勘误后的权威数值2026-11-01)。原始错误结果仅作勘误存档，不得引用。PR 保持 Draft，未合并。
+
+---
+
+[![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)

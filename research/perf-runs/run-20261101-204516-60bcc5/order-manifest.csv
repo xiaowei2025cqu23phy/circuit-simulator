@@ -1,0 +1,4 @@
+batch,case,case_index,case_seed,order_index,solver,start_time,exit_code,seconds
+1,heavy-12,0,20262031,0,inverse,2026-11-01T20:45:21.6047359+08:00,0,0.597
+1,heavy-12,0,20262031,1,inverse-rank1,2026-11-01T20:45:22.2496667+08:00,0,0.725
+1,heavy-12,0,20262031,2,lu,2026-11-01T20:45:22.9792698+08:00,0,0.532
