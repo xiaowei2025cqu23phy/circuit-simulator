@@ -4,13 +4,13 @@
 Circuit: one node with R to ground, C to ground, and a two-state PWL diode to
 ground. No independent source.
 
-    C dv/dt = -v/R - i_D(v),      i_D = 20*(v-0.70)  [ON],  1e-8*v [OFF]
+    C dv/dt = -(1/R + GMIN)*v - i_D(v),
 
 Continuous-time hybrid solution (piecewise exponential, exact):
 
-    ON : v(t) = v* + (v0 - v*) * exp(-t/tau_on),  v* = 14/(20 + 1/R),
-         tau_on = C/(20 + 1/R)
-    OFF: v(t) = v0 * exp(-t/(R*C))
+    ON : v(t) = v* + (v0 - v*) * exp(-t/tau_on),  v* = 14/(20 + 1/R + GMIN),
+         tau_on = C/(20 + 1/R + GMIN)
+    OFF: v(t) = v0 * exp(-t/tau_off),  tau_off = C/(1/R + 1e-8 + GMIN)
 
 State law: ON while v >= 0.65 V, OFF while v <= 0.70 V (50 mV hysteresis).
 
@@ -32,16 +32,21 @@ G_ON = 20.0
 V_F = 0.7
 I_EQ = G_ON * V_F          # 14 A
 G_OFF = 1e-8
+GMIN = 1e-12
 V_ON = 0.70
 V_OFF = 0.65
 
 
 def steady_on(R):
-    return I_EQ / (G_ON + 1.0 / R)
+    return I_EQ / (G_ON + 1.0 / R + GMIN)
 
 
 def tau_on(R, C):
-    return C / (G_ON + 1.0 / R)
+    return C / (G_ON + 1.0 / R + GMIN)
+
+
+def tau_off(R, C):
+    return C / (1.0 / R + G_OFF + GMIN)
 
 
 def analytic(case, R, C, t):
@@ -50,9 +55,9 @@ def analytic(case, R, C, t):
     if case == "C_off_zero":
         return 0.0, False, v_star, None
     if case == "B_off":
-        # initial OFF at 0.68 V, below the 0.70 turn-on threshold: pure RC decay
+        # Initial OFF at 0.68 V: include diode leakage and numerical ground conductance.
         v0 = 0.68
-        return v0 * math.exp(-t / (R * C)), False, v_star, None
+        return v0 * math.exp(-t / tau_off(R, C)), False, v_star, None
     if case != "A_on":
         raise ValueError("unknown case: " + case)
     v0 = 0.68
@@ -63,13 +68,13 @@ def analytic(case, R, C, t):
         return v, True, v_star, None
     # v* is below the OFF threshold: v decreases and crosses 0.65 at t_cross
     if abs(v0 - V_OFF) < 1e-15:
-        return v0 * math.exp(-t / (R * C)), False, v_star, 0.0
+        return v0 * math.exp(-t / tau_off(R, C)), False, v_star, 0.0
     t_cross = t_on * math.log((v0 - v_star) / (V_OFF - v_star))
     if t < t_cross:
         v = v_star + (v0 - v_star) * math.exp(-t / t_on)
         return v, True, v_star, t_cross
     # after the crossing: OFF decay from 0.65 V
-    v = V_OFF * math.exp(-(t - t_cross) / (R * C))
+    v = V_OFF * math.exp(-(t - t_cross) / tau_off(R, C))
     return v, False, v_star, t_cross
 
 
@@ -107,7 +112,7 @@ def main():
             "t_s": "", "v_analytic_v": v_star, "state_on": int(v_star >= V_OFF),
             "i_diode_a": diode_current(v_star, True), "p_diode_w": v_star * diode_current(v_star, True),
             "v_star_v": v_star, "tau_on_s": tau_on(R, C_DEFAULT),
-            "tau_off_s": R * C_DEFAULT,
+            "tau_off_s": tau_off(R, C)_DEFAULT,
             "on_steady_state_exists": int(v_star >= V_OFF),
         })
 
