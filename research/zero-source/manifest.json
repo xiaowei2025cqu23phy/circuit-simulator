@@ -51,7 +51,7 @@
       "sha256": "d3e14c943e61aabb5cbc7c7fe25385bd578bf890ca36d5762860d5e3c205ee0d"
     },
     "research/zero-source/analytic-reference.csv": {
-      "sha256": "7b4ed6a50100ce71d86d0af15e3c438a9b2062025892fc9f8872d273400a1441"
+      "sha256": "680b164715e60b4b148b77298821fed0b4a972b994704afd4744a8ff7b96610c"
     },
     "research/zero-source/transient-cases.csv": {
       "sha256": "8cd23f3f732b1f2690190c443a993da3bf56d1f0749d07b700cd7587457aebfa"
@@ -76,6 +76,9 @@
     },
     "research/round9-npm-build.log": {
       "sha256": "c31175d40329d376de0ecd366f730ca8333636aef6e3bf31f0a6dd85c81485bc"
+    },
+    "research/zero-source/analytic_reference.py": {
+      "sha256": "3f2f47fe796d5ff74a4ff3c2010a5458e1dec0e5093681252fd423b938ea95d5"
     }
   },
   "sources": {
@@ -89,7 +92,7 @@
       "sha256": "27216e98646787eb38699379d7a66afb65c154cd15deca87c58a8abfac877efc"
     },
     "research/zero-source/analytic_reference.py": {
-      "sha256": "f5ff67194abb8c6498e7ec2bcb2a8467fc5505f21b1bbc5bdf8f2a2d8659c3c0"
+      "sha256": "3f2f47fe796d5ff74a4ff3c2010a5458e1dec0e5093681252fd423b938ea95d5"
     },
     "src/sim/engine.js": {
       "sha256": "5f867a42a61dd30459dc4530f8842b62f122f8ab52ca21a58c2eed926cca7039"
@@ -99,6 +102,9 @@
     },
     "src/sim/manuscriptPassivityAudit.test.mjs": {
       "sha256": "01c9154e75774be9c829114b0515e4e6066b3fd6560730c128a9db04b01ca782"
+    },
+    "research/zero-source/analytic-reference.csv": {
+      "sha256": "680b164715e60b4b148b77298821fed0b4a972b994704afd4744a8ff7b96610c"
     }
   },
   "commands": [
@@ -114,5 +120,11 @@
     "newTestCount": 4,
     "referenceCorrection": "OFF leakage and GMIN incorporated into analytic_reference.py, analytic-reference.csv and step-size-convergence.csv",
     "status": "code committed; CI/local rerun not yet independently verified"
+  },
+  "preSubmissionValidation": {
+    "date": "2026-11-02",
+    "fixed": "analytic_reference.py line 115 syntax error (tau_off(R, C)_DEFAULT)",
+    "regenerated": "analytic-reference.csv",
+    "consistency": "step-size-convergence.csv analytic column matches recomputation exactly (73 rows, max diff 0)"
   }
 }
