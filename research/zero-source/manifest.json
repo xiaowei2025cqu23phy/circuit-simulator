@@ -51,7 +51,7 @@
       "sha256": "d3e14c943e61aabb5cbc7c7fe25385bd578bf890ca36d5762860d5e3c205ee0d"
     },
     "research/zero-source/analytic-reference.csv": {
-      "sha256": "c78509421dfd92f35c3abab8e6822af67c30efff67d74f7e6f58ed7950a22b04"
+      "sha256": "7b4ed6a50100ce71d86d0af15e3c438a9b2062025892fc9f8872d273400a1441"
     },
     "research/zero-source/transient-cases.csv": {
       "sha256": "8cd23f3f732b1f2690190c443a993da3bf56d1f0749d07b700cd7587457aebfa"
@@ -60,7 +60,7 @@
       "sha256": "f296b20a4a664e4c94a32c6da7575d9041f7becbb7757a23ff74540d70f3822d"
     },
     "research/zero-source/step-size-convergence.csv": {
-      "sha256": "7e84826a03857e691aedc2535ee4f3d33dcb5657cd059180fee0b55a0b7a7a32"
+      "sha256": "b7392c08cac3fb95a6697910115084789fe1c7d89ffacbecb1e556a78b013bca"
     },
     "research/zero-source/resistance-scan.csv": {
       "sha256": "bd653475fc276e024e43575d4ee1a297a9a72e64a8c89cb187654cbcffadcbe4"
@@ -89,13 +89,16 @@
       "sha256": "27216e98646787eb38699379d7a66afb65c154cd15deca87c58a8abfac877efc"
     },
     "research/zero-source/analytic_reference.py": {
-      "sha256": "2be024a1bc2961ef5d59861d7a521b5b36c01b61ebdffc6a9fca830913985e3a"
+      "sha256": "f5ff67194abb8c6498e7ec2bcb2a8467fc5505f21b1bbc5bdf8f2a2d8659c3c0"
     },
     "src/sim/engine.js": {
       "sha256": "5f867a42a61dd30459dc4530f8842b62f122f8ab52ca21a58c2eed926cca7039"
     },
     "src/sim/mnaResidual.js": {
       "sha256": "d34c8a5ddb4852ea3b7a11c7486f8c6f0a39812ef24e04792ff552229280983b"
+    },
+    "src/sim/manuscriptPassivityAudit.test.mjs": {
+      "sha256": "01c9154e75774be9c829114b0515e4e6066b3fd6560730c128a9db04b01ca782"
     }
   },
   "commands": [
@@ -104,5 +107,12 @@
     "node --test src/sim/zeroSourcePassivity.test.mjs",
     "npm ci && npm test && npm run lint && npm run build"
   ],
-  "scope": "Zero-source single-node RC-PWL math/passivity check with an independent Python analytic reference. Not a physical device validation; no ngspice run; production device model unchanged."
+  "scope": "Zero-source single-node RC-PWL math/passivity check with an independent Python analytic reference. Not a physical device validation; no ngspice run; production device model unchanged.",
+  "auditUpdate": {
+    "note": "Pre-submission targeted corrections after original 119-test run; original 119/119 log predates new four-test file. Re-run the full test suite before publishing a new claim.",
+    "newTests": "src/sim/manuscriptPassivityAudit.test.mjs",
+    "newTestCount": 4,
+    "referenceCorrection": "OFF leakage and GMIN incorporated into analytic_reference.py, analytic-reference.csv and step-size-convergence.csv",
+    "status": "code committed; CI/local rerun not yet independently verified"
+  }
 }
