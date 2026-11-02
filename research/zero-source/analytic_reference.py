@@ -112,7 +112,7 @@ def main():
             "t_s": "", "v_analytic_v": v_star, "state_on": int(v_star >= V_OFF),
             "i_diode_a": diode_current(v_star, True), "p_diode_w": v_star * diode_current(v_star, True),
             "v_star_v": v_star, "tau_on_s": tau_on(R, C_DEFAULT),
-            "tau_off_s": tau_off(R, C)_DEFAULT,
+            "tau_off_s": tau_off(R, C_DEFAULT),
             "on_steady_state_exists": int(v_star >= V_OFF),
         })
 

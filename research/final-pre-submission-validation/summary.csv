@@ -1,0 +1,6 @@
+claim,status,evidence
+same-model prediction vs endpoint correction,pass,"round9-stage3-same-model.csv: rectifier 1.3748e-2 vs 1.2727e-3 V; bank24 1.0140e-1 vs 3.9414e-5 V; freewheel 118.46 vs 7.05e-9 V"
+zero-source PWL charging,pass,"case-summary.csv: v 0.68 -> 0.699955 V, diode energy -6.30e-8 J, energy balance -7.9e-21 J"
+KCL vs energy vs passivity distinction,pass,"manuscriptPassivityAudit 4/4; zeroSourcePassivity 11/11"
+legacy tolerance caveat,pass-with-wording-caution,"legacy releases ON branch and tracks Shockley locally; not a global passivity guarantee"
+analytic reference reproducibility,fixed,"script syntax error fixed; CSV regenerated; step-size analytic column exact match (0 diff)"
