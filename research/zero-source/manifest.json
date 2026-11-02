@@ -1,0 +1,108 @@
+{
+  "title": "HSP-MNA zero-source energy and passivity verification",
+  "date": "2026-11-02",
+  "branch": "research/hsp-mna-local-validation",
+  "baseCommit": "372b3a4",
+  "environment": {
+    "node": "v26.8.1",
+    "npm": "11.19.0",
+    "platform": "win32",
+    "cpu": "AMD Ryzen 5 7520U with Radeon Graphics",
+    "os": "Windows 11 家庭版"
+  },
+  "circuit": {
+    "R_ohm": 1000,
+    "C_f": 0.000001,
+    "v0_v": 0.68,
+    "g_on_s": 20,
+    "vf_v": 0.7,
+    "g_off_s": 1e-8,
+    "v_on_v": 0.7,
+    "v_off_v": 0.65,
+    "sourceSampling": "be-end",
+    "linearSolver": "lu",
+    "GMIN_s": 1e-12
+  },
+  "findings": {
+    "onSteadyStateV": 0.6999650017498775,
+    "negativeDiodePowerW": -0.0006296132354732295,
+    "netDiodeEnergyJ": -6.296132354732295e-8,
+    "capEnergyChangeJ": 1.376851832683909e-8,
+    "energyBalanceResidualJ": -7.940933880509066e-21,
+    "zeroSourceCharging": true,
+    "legacyReleaseV": 0.26216705322714856,
+    "shockleyFinalV": 0.09201319836957121,
+    "legacyFinalV": 0.09203535452121427,
+    "onSteadyStateConditionR_ohm": 0.65,
+    "convergence": {
+      "h1ns_error_at_50ns": 0.00007284476004854046,
+      "h10ns_error_at_50ns": 0.0006788056647617502,
+      "h50ns_error_at_50ns": 0.0026379048584493914,
+      "h100us_error_at_100us": 0.000009977013552542324
+    },
+    "tests": {
+      "total": 119,
+      "passed": 119,
+      "newZeroSource": 11
+    }
+  },
+  "artifacts": {
+    "docs/hsp-mna-zero-source-passivity.md": {
+      "sha256": "d3e14c943e61aabb5cbc7c7fe25385bd578bf890ca36d5762860d5e3c205ee0d"
+    },
+    "research/zero-source/analytic-reference.csv": {
+      "sha256": "c78509421dfd92f35c3abab8e6822af67c30efff67d74f7e6f58ed7950a22b04"
+    },
+    "research/zero-source/transient-cases.csv": {
+      "sha256": "8cd23f3f732b1f2690190c443a993da3bf56d1f0749d07b700cd7587457aebfa"
+    },
+    "research/zero-source/case-summary.csv": {
+      "sha256": "f296b20a4a664e4c94a32c6da7575d9041f7becbb7757a23ff74540d70f3822d"
+    },
+    "research/zero-source/step-size-convergence.csv": {
+      "sha256": "7e84826a03857e691aedc2535ee4f3d33dcb5657cd059180fee0b55a0b7a7a32"
+    },
+    "research/zero-source/resistance-scan.csv": {
+      "sha256": "bd653475fc276e024e43575d4ee1a297a9a72e64a8c89cb187654cbcffadcbe4"
+    },
+    "research/zero-source/model-comparison.csv": {
+      "sha256": "e40a00c1eb4c0b83d8938fe4dd3992bc4f28da03ae2b08a0a2d383798798ebec"
+    },
+    "research/round9-npm-test.log": {
+      "sha256": "f7ad166dd81fe204188dfc1e70127bbbb742b7b7f187f0d173c829cd9fdedc3f"
+    },
+    "research/round9-npm-lint.log": {
+      "sha256": "8e48f226dbb73cb441e0f6b3b642cd837606dd25806cb6a7a09976ed3669accd"
+    },
+    "research/round9-npm-build.log": {
+      "sha256": "c31175d40329d376de0ecd366f730ca8333636aef6e3bf31f0a6dd85c81485bc"
+    }
+  },
+  "sources": {
+    "src/sim/zeroSourcePassivity.test.mjs": {
+      "sha256": "89964388a8f3a35f91b1735d95a08fd1696d523ab085081ab71f4ef2e4d6f618"
+    },
+    "src/sim/researchDiodeModels.js": {
+      "sha256": "f7f85a17e469948d4d2772271f567b69c450aeab42e23f7f6b3a629e0a5c87a1"
+    },
+    "scripts/zero-source-passivity.mjs": {
+      "sha256": "27216e98646787eb38699379d7a66afb65c154cd15deca87c58a8abfac877efc"
+    },
+    "research/zero-source/analytic_reference.py": {
+      "sha256": "2be024a1bc2961ef5d59861d7a521b5b36c01b61ebdffc6a9fca830913985e3a"
+    },
+    "src/sim/engine.js": {
+      "sha256": "5f867a42a61dd30459dc4530f8842b62f122f8ab52ca21a58c2eed926cca7039"
+    },
+    "src/sim/mnaResidual.js": {
+      "sha256": "d34c8a5ddb4852ea3b7a11c7486f8c6f0a39812ef24e04792ff552229280983b"
+    }
+  },
+  "commands": [
+    "python research/zero-source/analytic_reference.py",
+    "node scripts/zero-source-passivity.mjs",
+    "node --test src/sim/zeroSourcePassivity.test.mjs",
+    "npm ci && npm test && npm run lint && npm run build"
+  ],
+  "scope": "Zero-source single-node RC-PWL math/passivity check with an independent Python analytic reference. Not a physical device validation; no ngspice run; production device model unchanged."
+}

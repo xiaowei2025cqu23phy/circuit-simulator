@@ -228,6 +228,7 @@ export function runStateModel(elements, {
 export function runShockleyModel(elements, {
   dt = 5e-5, duration = 0.04, params = {}, probe = null,
   maxNewtonIterations = 50, stepTolerance = 1e-12, residualTolerance = 1e-10,
+  initialState = {},
 } = {}) {
   const p = resolveShockley(params);
   const nVt = p.n * p.vt;
@@ -235,7 +236,7 @@ export function runShockleyModel(elements, {
   const steps = Math.round(duration / dt);
   const probeIdx = probeIndex(eng, probe);
   const diodeEls = eng.validEls.filter(el => el.type === 'diode');
-  const state = {};
+  const state = { ...initialState };
   const t = new Float64Array(steps);
   const v = new Float64Array(steps);
   let solves = 0, newtonIterations = 0, newtonFailures = 0;
