@@ -1,0 +1,14 @@
+
+* DC sweep for the Shockley reference
+V1 s 0 0
+R1 s n 1k
+D1 n 0 DSHOCK
+.model DSHOCK D(IS=1e-12 N=1.8 RS=0)
+.options reltol=1e-9 abstol=1e-16 vntol=1e-12
+.dc V1 0 2.5 0.005
+.control
+run
+set wr_singlescale
+wrdata shockley_dc.txt i(V1)
+.endc
+.end

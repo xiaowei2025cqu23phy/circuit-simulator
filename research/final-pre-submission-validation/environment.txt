@@ -1,0 +1,9 @@
+commit=23bbfd93ebd222ce19c332ac5c189d110bb6487e
+branch=research/hsp-mna-local-validation
+node=v26.8.1
+npm=11.19.0
+python=Python 3.12.14
+os=Microsoft Windows 11 家庭版 中文版
+cpu=AMD Ryzen 5 7520U with Radeon Graphics
+time=2026-11-02T23:42:25.2728841+08:00
+worktree_clean=True

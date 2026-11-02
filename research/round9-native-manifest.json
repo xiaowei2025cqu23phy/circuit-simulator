@@ -1,0 +1,159 @@
+{
+  "title": "Round 9 native Node verification of multi-topology MNA, KCL/KVL residuals and PWL reverse ON current",
+  "date": "2026-10-30",
+  "branch": "research/hsp-mna-local-validation",
+  "baseCommitBeforeNativeRuns": "06025ac302efb510db09ac089f3cea9019e5dfde",
+  "environment": {
+    "node": "v26.8.1",
+    "npm": "11.19.0",
+    "platform": "win32",
+    "arch": "x64",
+    "os": "Windows 11 家庭版",
+    "cpu": "AMD Ryzen 5 7520U with Radeon Graphics",
+    "cpuCount": 8,
+    "totalMemoryGiB": 15.24
+  },
+  "sourceFiles": {
+    "src/sim/engine.js": {
+      "gitBlob": "281f9e675f84d3440361c8a0c6efcad225f40001",
+      "sha256": "c79fc625c950e088e2c2b0991352a3ed9ce215b57d0dd627ffc5a7eb0f3b321a"
+    },
+    "src/sim/statePrediction.js": {
+      "gitBlob": "b85c0f07948d179dc27972e285d71e4b7e9d3404",
+      "sha256": "f8517ee68d8ac6c2091e9ff9a031703b2b254e26e4c9ef7e50369686b71b0d05"
+    },
+    "src/sim/linearSolve.js": {
+      "gitBlob": "e5f1ba67f4a23da02963ff11658ca068affb743b",
+      "sha256": "6eecf9065450005fc62dfcdfab70fe6cdd790808322edc7747f5654ebb32f8e4"
+    },
+    "src/sim/rankOneUpdate.js": {
+      "gitBlob": "1284e67ead232a48f635460fe1f2a9def21c49ac",
+      "sha256": "95da0bc7703d0ec9bba0a0e7d558bbb148ff4f5a40d0e6ffe24c090df245f4b2"
+    },
+    "src/sim/researchCircuits.js": {
+      "gitBlob": "f2696e1093204a4d300d2314a06de4f088b93b01",
+      "sha256": "79986252be5e9bead479478251ab644329a436cf9c11947fa1cf629d8d03e973"
+    },
+    "src/sim/mnaResidual.js": {
+      "gitBlob": "6ff1815907cf125673786f07c690dc8166887cc9",
+      "sha256": "dcd05b4ed223018759437d66a3a5a3749305f98559af1f2aafa7bdaa0cc0bb8f"
+    },
+    "src/sim/multiTopology.test.mjs": {
+      "gitBlob": "9885369f097dc85f5ca91be5523161ccf5f9457b",
+      "sha256": "5935eef3ccb8cc96ad7ecdcea8fa75a81602f51613da634f88e77fed922b79b6"
+    },
+    "scripts/benchmark-multi-topology.mjs": {
+      "gitBlob": "7c7f793af4c7318585cafec63afe8508ff6487ba",
+      "sha256": "62a2bd95308c4b5b755e846629a482c20ada671628890e048dba26dde4fa07d3"
+    },
+    "scripts/benchmark-large-mna.mjs": {
+      "gitBlob": "a28e169ed3bdce7d70961c1d8178db58891f4b01",
+      "sha256": "4a0e0ee283e499ac40c2dae7addfa5c9a650e2d3194c106bb792f10e532131d6"
+    },
+    "scripts/inspect-pwl-current-direction.mjs": {
+      "gitBlob": "7d9ee12f5f620022f56b76ce191466a1c2ad54ce",
+      "sha256": "f0bf49d37fe9c256e1761fdc49f5a096fd8fa2cab1fb4825b1cc80a6aee34da1"
+    },
+    "scripts/verify-pwl-reverse-current.mjs": {
+      "gitBlob": "03d13429256bd93f7d9c125ed12002846dd41e01",
+      "sha256": "9642efbbc25ebf0526b21f76ae720b961fc01ef923de6c18f54567d4b25461f6"
+    }
+  },
+  "artifacts": {
+    "research/round9-multitopology-node.csv": {
+      "sha256": "29fc4619908af9eca2d5fc66a81c5851ad758908f52445556296120e466337ee"
+    },
+    "research/round9-large-mna-node.csv": {
+      "sha256": "129054753474be19ceaa2b6e3fe41b8444b5585faa6b427be288d266d298b3b8"
+    },
+    "research/round9-pwl-reverse-current-node.csv": {
+      "sha256": "17483d4231733b6d4630026b4b9b7ecf7c4ea8e692e5c3a07ed2d52ebec1983a"
+    },
+    "research/round9-pwl-reverse-current-independent.csv": {
+      "sha256": "17a92ee76be5d026f6f021b198cf6abe09f42ab22229a4a76d3f0b99384d3cd5"
+    },
+    "research/round9-npm-test.log": {
+      "sha256": "64183c45084100459f1e4cd47874750cc9dcb14cdaf10d089914524ff5cfb2c3"
+    },
+    "research/round9-npm-lint.log": {
+      "sha256": "8e48f226dbb73cb441e0f6b3b642cd837606dd25806cb6a7a09976ed3669accd"
+    },
+    "research/round9-npm-build.log": {
+      "sha256": "499173bf6be0142163a31b763e2017777bc69b42fc3879c482bd5de6f4bab693"
+    }
+  },
+  "commands": [
+    "npm ci",
+    "npm test",
+    "npm run lint",
+    "npm run build",
+    "npm run benchmark:hsp:topologies",
+    "npm run benchmark:hsp:large -- --sizes=64,96,128,256 --repetitions=3",
+    "node scripts/inspect-pwl-current-direction.mjs",
+    "npm run verify:pwl-current"
+  ],
+  "results": {
+    "tests": "76/76 native Node (74 upstream + 2 added hardening tests)",
+    "lint": "pass",
+    "build": "pass; 1728 modules, JS gzip 87.39 kB",
+    "multiTopology": {
+      "rows": 45,
+      "cases": 15,
+      "solvers": 3,
+      "steps": 800,
+      "dt_us": 50,
+      "repetitions": 5,
+      "maxKclResidualA": 2.283e-11,
+      "maxKvlResidualV": 1.954e-14,
+      "maxMixedUnknownDifference": 1.467e-11,
+      "maxProbeVoltageDifferenceV": 5.647e-12,
+      "maxJointDiodeTransitions": 24,
+      "unresolvedSteps": 0
+    },
+    "largeMna": {
+      "rows": 51,
+      "sizes": [
+        64,
+        96,
+        128,
+        256
+      ],
+      "repetitions": 3,
+      "maxKclResidualA": 2.271e-11,
+      "maxKvlResidualV": 3.34e-13,
+      "maxMixedUnknownDifference": 6.532e-11,
+      "maxJointDiodeTransitions": 127,
+      "unresolvedSteps": 0
+    },
+    "pwlReverseCurrent": {
+      "iterative": {
+        "negativeOnSamples": 0,
+        "minOnCurrentA": [
+          0.000003593,
+          0.00952
+        ]
+      },
+      "hystereticCorrected": {
+        "negativeOnSamples": [
+          1670,
+          320
+        ],
+        "minOnCurrentA": [
+          -0.008271,
+          -0.9942
+        ]
+      },
+      "independentResolveMaxAbsDifference": [
+        5.55e-17,
+        1.687e-14
+      ]
+    },
+    "rankOneVsLu": {
+      "scenarios": 32,
+      "rankOneFaster": 3,
+      "luFastest": 27,
+      "worstCase": "heavy diode bank 256: rank-one 3766 ms vs LU 2002 ms (1.88x slower) with 9 vs 21 factorizations"
+    }
+  },
+  "scope": "Dense native Node transient core with real device stamps. NOT sparse industrial MNA, browser UI timing, ngspice or physical diode accuracy."
+}

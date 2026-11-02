@@ -125,6 +125,14 @@ export function stepEngineWithDiodeRefinement(eng, probeId = null, {
       runSegment(h / 2, depth + 1);
     } else {
       accepted += 1;
+      // Record the exact accepted segment so an external residual diagnostic
+      // can use the REAL substep length and the history captured at its start.
+      eng.lastAcceptedSegment = {
+        dt: h,
+        tStart: start.t,
+        tEnd: eng.t,
+        historyBefore: { ...start.state },
+      };
       if (depth > 0) eng.diagnostics.eventAcceptedSubsteps += 1;
       if (switched && hasInitialHistory) {
         eng.diagnostics.eventTransitionCount += 1;

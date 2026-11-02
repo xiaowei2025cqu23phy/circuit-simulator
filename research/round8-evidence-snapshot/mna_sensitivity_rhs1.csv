@@ -1,0 +1,13 @@
+mna_dimension,method,median_ms,q1_ms,q3_ms,complete_factorizations,rank_one_updates,rank_one_fallbacks,linear_solutions,worst_residual_inf,worst_delta_vs_full_inverse_v,events,rhs_per_event,node_version,cpu_model
+32,gauss-jordan-inverse,6.772088,6.404453,6.980240,25,0,0,24,3.552714e-15,0.000000e+0,24,1,v22.16.0,AMD EPYC 9V74 80-Core Processor
+32,dense-lu,1.898959,1.889525,2.114735,25,0,0,24,3.552714e-15,6.661338e-16,24,1,v22.16.0,AMD EPYC 9V74 80-Core Processor
+32,inverse-rank1,1.738417,1.667450,2.255597,1,24,0,24,1.065814e-14,7.549517e-15,24,1,v22.16.0,AMD EPYC 9V74 80-Core Processor
+64,gauss-jordan-inverse,49.766927,48.715629,51.945748,25,0,0,24,7.105427e-15,0.000000e+0,24,1,v22.16.0,AMD EPYC 9V74 80-Core Processor
+64,dense-lu,11.045182,10.971341,11.491854,25,0,0,24,3.552714e-15,1.554312e-15,24,1,v22.16.0,AMD EPYC 9V74 80-Core Processor
+64,inverse-rank1,8.483680,8.081269,8.883797,1,24,0,24,3.552714e-15,4.218847e-15,24,1,v22.16.0,AMD EPYC 9V74 80-Core Processor
+96,gauss-jordan-inverse,166.996074,163.549107,201.918663,25,0,0,24,7.105427e-15,0.000000e+0,24,1,v22.16.0,AMD EPYC 9V74 80-Core Processor
+96,dense-lu,35.086823,35.067203,41.463845,25,0,0,24,7.105427e-15,1.332268e-15,24,1,v22.16.0,AMD EPYC 9V74 80-Core Processor
+96,inverse-rank1,19.962319,18.360116,20.934302,1,24,0,24,7.105427e-15,3.774758e-15,24,1,v22.16.0,AMD EPYC 9V74 80-Core Processor
+128,gauss-jordan-inverse,377.650283,348.691501,399.505664,25,0,0,24,7.105427e-15,0.000000e+0,24,1,v22.16.0,AMD EPYC 9V74 80-Core Processor
+128,dense-lu,73.347083,71.006548,87.184701,25,0,0,24,3.552714e-15,1.554312e-15,24,1,v22.16.0,AMD EPYC 9V74 80-Core Processor
+128,inverse-rank1,33.120345,32.838869,38.207963,1,24,0,24,7.660539e-15,9.325873e-15,24,1,v22.16.0,AMD EPYC 9V74 80-Core Processor

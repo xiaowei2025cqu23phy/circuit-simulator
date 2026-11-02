@@ -1,0 +1,4 @@
+mna_dimension,method,median_ms,q1_ms,q3_ms,complete_factorizations,rank_one_updates,rank_one_fallbacks,linear_solutions,worst_residual_inf,worst_delta_vs_full_inverse_v,events,rhs_per_event,node_version,cpu_model
+128,gauss-jordan-inverse,872.297500,862.658500,1085.195500,25,0,0,768,7.105427e-15,0.000000e+0,24,32,v26.8.1,AMD Ryzen 5 7520U with Radeon Graphics         
+128,dense-lu,163.896200,158.733600,208.656000,25,0,0,768,7.105427e-15,1.998401e-15,24,32,v26.8.1,AMD Ryzen 5 7520U with Radeon Graphics         
+128,inverse-rank1,505.984800,437.308500,644.480300,1,24,0,768,1.365574e-14,1.521006e-14,24,32,v26.8.1,AMD Ryzen 5 7520U with Radeon Graphics         

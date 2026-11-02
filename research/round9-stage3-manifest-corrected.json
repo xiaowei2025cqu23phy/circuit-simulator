@@ -1,0 +1,162 @@
+{
+  "title": "HSP-MNA round 9 stage 3 CORRECTIONS: independent-review remediation evidence",
+  "date": "2026-11-01",
+  "branch": "research/hsp-mna-local-validation",
+  "reviewedBaseline": "de671af6beaf960321c2b42dfb84892bd90d24a0",
+  "corrections": {
+    "P0-1": "PWL calibration formula fixed (V0 = Vref - Iref/gRef); DC/transient/ngspice rerun; prior conclusion retracted",
+    "P0-2": "event refinement total work (accepted+rejected) and per-substep residual dt/history fixed; 1180 solves at 24-diode/50us (+47.5%)",
+    "P0-3": "exhausted state iteration now rolls back to last solved state, rebuilds and re-solves; lastStepConverged flag; forced-path tests",
+    "P0-4": "unique run id, per-run directory, refusal to overwrite/append, strict aggregation rejecting duplicates/incomplete/NaN",
+    "P1-1": "cluster bootstrap over independent processes; retract 10/11 significance claim; heavy-12 run-dependent",
+    "P1-2": "temperature unified to 300.15 K; DC max diff 4.77e-7 A -> 3.29e-10 A; attribution corrected",
+    "P1-3": "performance mechanism wording separates code facts, timing observations and unverified speculation (no GC attribution)",
+    "P2": "manifest, logs, superseded archive and regenerated data committed"
+  },
+  "environment": {
+    "node": "v26.8.1",
+    "npm": "11.19.0",
+    "platform": "win32",
+    "arch": "x64",
+    "cpu": "AMD Ryzen 5 7520U with Radeon Graphics",
+    "os": "Windows 11 家庭版",
+    "ngspice": {
+      "version": "ngspice-47 portable",
+      "temperatureK": 300.15,
+      "executableSha256": "22D5CAE2BD32B2E39157A8D27BF457122F68285B72A9EBEFDF41551B628233AB"
+    }
+  },
+  "performanceRun": {
+    "runId": "run-20261101-204551-4c74d5",
+    "processes": 99,
+    "samples": 297,
+    "batches": 3,
+    "repsPerProcess": 3,
+    "warmup": 1,
+    "seed": 20261031,
+    "unit": "independent process (cluster bootstrap)",
+    "bootstrapRounds": 2000
+  },
+  "artifacts": {
+    "docs/hsp-mna-round9-stage3-corrections.md": {
+      "sha256": "44577b7fbc610d4c96505d296915b484706526eb981eae7cb27eb62afce0cdcf"
+    },
+    "docs/hsp-mna-round9-stage3-review.md": {
+      "sha256": "f00b04d0d9a29393c38a3939fbeb74e3da08375d65e7ebd15ffcddf032c7dc14"
+    },
+    "README.md": {
+      "sha256": "fd124a0dd8f508a5b3e22d31cddf2cd2298645de87c7998e2e7148c0cfcb630e"
+    },
+    "research/round9-stage3-calibration-check.csv": {
+      "sha256": "a2a40b35698e137b372ddeb05407374e3b8f2aab71c7bc5f4c030cdbb6bdf7b8"
+    },
+    "research/round9-stage3-diode-transient.csv": {
+      "sha256": "dab944aedaca9d53552e0b27036226c03bf8f07c88d1af93169b2e9d782abc65"
+    },
+    "research/round9-stage3-diode-dc.csv": {
+      "sha256": "94445f81fbec3a51d2d0332902b3b63432736ac55b978f472b2af373abb18d7f"
+    },
+    "research/round9-stage3-diode-reverse-current.csv": {
+      "sha256": "cc61f70889b350f99cb13831223eb11d6408f72bb042554e7a37d4377686cf41"
+    },
+    "research/round9-stage3-same-model.csv": {
+      "sha256": "4adbc0821f3d141c222d4f7264d30d8ca16c956fa2e556ab12bbf00e89a673e4"
+    },
+    "research/round9-stage3-performance-corrected.csv": {
+      "sha256": "8b8d2c44c119c48a0ec09518db0079dd1dc05e754b1361a1f28ecbf734f3c1b3"
+    },
+    "research/round9-stage3-performance-corrected.json": {
+      "sha256": "db75076b06a6a9bb5dbd3911e39c57ffd28a241901caf0efbd337732301eee7f"
+    },
+    "research/perf-runs/run-20261101-204551-4c74d5/metadata.json": {
+      "sha256": "4b02d95adf0aa61db06df18257bd677960dd8da0db273965f7f579d59fdab287"
+    },
+    "research/perf-runs/run-20261101-204551-4c74d5/order-manifest.csv": {
+      "sha256": "a3b23131d202c1f7d09ce9e7d5515e3247f8b0c76087c63d7f3ce2b5f8e29aa3"
+    },
+    "research/perf-runs/run-20261101-204551-4c74d5/source-hashes.json": {
+      "sha256": "eada4bc472670541c99e48ce73c68494d03f0f6076f8e0ffe910b49b03c37dbb"
+    },
+    "research/perf-runs/run-20261101-204551-4c74d5/summary.csv": {
+      "sha256": "8b8d2c44c119c48a0ec09518db0079dd1dc05e754b1361a1f28ecbf734f3c1b3"
+    },
+    "research/perf-runs/run-20261101-204551-4c74d5/summary.json": {
+      "sha256": "db75076b06a6a9bb5dbd3911e39c57ffd28a241901caf0efbd337732301eee7f"
+    },
+    "research/ngspice-stage3/shockley_tran.cir": {
+      "sha256": "b2fa7f3479d1e1b94d0f5bbba8c99fdebbd74297f898808c117361ec4bd744f4"
+    },
+    "research/ngspice-stage3/shockley_dc.cir": {
+      "sha256": "897be07e6557090689faa8a0ddedd04535f680312e1ddae1c5cd7efb97346e41"
+    }
+  },
+  "sources": {
+    "src/sim/engine.js": {
+      "sha256": "5f867a42a61dd30459dc4530f8842b62f122f8ab52ca21a58c2eed926cca7039"
+    },
+    "src/sim/mnaResidual.js": {
+      "sha256": "d34c8a5ddb4852ea3b7a11c7486f8c6f0a39812ef24e04792ff552229280983b"
+    },
+    "src/sim/eventRefinement.js": {
+      "sha256": "7c6231a3b55916f8675a9983e60efebd944a2f828eb43fe7477cde7852119ce3"
+    },
+    "src/sim/researchDiodeModels.js": {
+      "sha256": "30540aaceb4f6bb212b983f239893929cc9cfbc5073046f4aa7decf576b9c8f8"
+    },
+    "src/sim/independentMna.js": {
+      "sha256": "d0cb4414c7f331934c50b98a3866ac2ac0de9692b04f19a21207fb0b0d820184"
+    },
+    "src/sim/perfStats.js": {
+      "sha256": "6c69132b870ec86c79296f8be412345c5e6666f3ed22eb195b0453fd551e5563"
+    },
+    "src/sim/mnaResidual.test.mjs": {
+      "sha256": "35bdd6951375719fa0cbaf49f22c40dd1caaf5875d14a984abe9db264da06725"
+    },
+    "src/sim/timing.test.mjs": {
+      "sha256": "ffd99a24c82c4712510073a91aaa3fda4a6c8ef521c2ade2ee0768d23244c276"
+    },
+    "src/sim/eventAccounting.test.mjs": {
+      "sha256": "c1bc2677c0b9d2fcced925e7aa532fe92a5e6f1f29bf734ffc6820139a8f7c64"
+    },
+    "src/sim/stateFailure.test.mjs": {
+      "sha256": "40670f9086a014b28377b66857d816461735e47ce61a15851c4a0e7a3f43473c"
+    },
+    "src/sim/perfStats.test.mjs": {
+      "sha256": "fea242c2968ee2e92cebbde26c54eb25723b05acce60bc77b08c08ff7a59cff6"
+    },
+    "src/sim/researchDiodeModels.test.mjs": {
+      "sha256": "5509e4f19e732835691d148b66268edd2b6c76259fb9cf753dbdad7e56b825d5"
+    },
+    "scripts/perf-probe.mjs": {
+      "sha256": "2782907eb40269264b6d68b9c01e0e97cf2492a87bb151a41561036b80d35aa4"
+    },
+    "scripts/perf-aggregate.mjs": {
+      "sha256": "0fe4654966eae85c8e3e6773fcfc09902cf782df18a45df053a3a33a84775869"
+    },
+    "scripts/run-stage3-perf.ps1": {
+      "sha256": "945d4c2f0cf031df71a83ea8d3c01f9324317abc27b5eeae8b28d7a5a4d786fe"
+    },
+    "scripts/compare-hsp-same-model.mjs": {
+      "sha256": "8d8958ca8471605474955dd2eb73655039ec9c64cc2e2df0b83c875aaeda4fdc"
+    },
+    "scripts/compare-diode-models.mjs": {
+      "sha256": "48f12fd9e255239aecacd2c427adb1c6d2da386f7b0346f72d3146854d0255b2"
+    },
+    "scripts/verify-pwl-calibration.mjs": {
+      "sha256": "6e015fbdc7cbd70dccf231ae4ab89538eefe1bb1272586985bdd600bcf65a1b8"
+    }
+  },
+  "supersededArchive": "research/round9-stage3-erratum/ (all *_SUPERSEDED files; do not cite)",
+  "commands": [
+    "npm ci",
+    "npm test",
+    "npm run lint",
+    "npm run build",
+    "node scripts/verify-pwl-calibration.mjs",
+    "node scripts/compare-diode-models.mjs",
+    "node scripts/compare-hsp-same-model.mjs",
+    "pwsh -File scripts/run-stage3-perf.ps1 -Batches 3 -Reps 3 -Warmup 1 -Seed 20261031",
+    "node scripts/perf-aggregate.mjs --run=research/perf-runs/<runId>"
+  ],
+  "scope": "Dense native Node transient core with real device stamps plus a portable ngspice reference for the Shockley chain only. Not sparse industrial MNA, browser timing, or hardware measurement."
+}

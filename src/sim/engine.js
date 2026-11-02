@@ -259,6 +259,17 @@ export function compileCircuit(els, dt = DEFAULT_DT, options = {}) {
   if (!Number.isFinite(correctionGuard) || correctionGuard < 0) throw new Error('校正容差必须为非负有限数');
   const adaptiveScale = options.adaptiveScale ?? 0.2;
   if (!Number.isFinite(adaptiveScale) || adaptiveScale <= 0) throw new Error('自适应电压尺度必须大于零');
+  // Research-only knob so the maximum-iteration failure path is testable.
+  const maxStateIterations = options.maxStateIterations ?? 12;
+  if (!Number.isInteger(maxStateIterations) || maxStateIterations < 1 || maxStateIterations > 64) {
+    throw new Error('状态迭代次数上限应为 1 到 64 之间的整数');
+  }
+  // Research-only phase instrumentation. Off by default so the shipped solver
+  // keeps its exact timestep path; every measurement below is guarded.
+  const recordTiming = options.recordTiming === true;
+  if (options.recordTiming !== undefined && typeof options.recordTiming !== 'boolean') {
+    throw new Error('recordTiming 选项必须为布尔值');
+  }
   const dsu = new DSU();
   let hasGround = false;
   const labelsByText = {};
@@ -396,9 +407,23 @@ export function compileCircuit(els, dt = DEFAULT_DT, options = {}) {
     state: {}, history: [], currentNodes: {}, allEls: engineEls, switchStates,
     needsMatrixRebuild: false, lastMeasured: null, lastUiTime: 0,
     diodeSolver, correctionGuard, adaptiveScale, previousSolution: null,
+    maxStateIterations, lastStepConverged: true,
+    recordTiming,
+    // Monotonic work counters. They are NEVER rolled back by event-refinement
+    // snapshots, so they record every real solver call including rejected
+    // trials. Used to audit that diagnostics accounting matches actual work.
+    work: { solveCalls: 0, factorizationCalls: 0, rankOneUpdateCalls: 0, rankOneFallbackCalls: 0 },
+    lastAcceptedSegment: null,
+    timing: recordTiming ? {
+      matrixRebuildMs: 0, factorizeMs: 0, rankOneUpdateMs: 0,
+      rhsAssemblyMs: 0, rhsSolveMs: 0,
+      factorizations: 0, rankOneAttempts: 0, rankOneUpdates: 0,
+      rankOneCapSkips: 0, rankOneFailures: 0, linearSolves: 0,
+    } : null,
     diagnostics: { steps: 0, linearSolves: 0, matrixRebuilds: 0, stateDisagreements: 0, unresolvedSteps: 0,
       stateCorrections: 0, stepsWithCorrections: 0, adaptiveTightenedSteps: 0,
-      factorizations: 1, alignedTimeEvents: 0, rankOneUpdates: 0, rankOneFallbacks: 0 },
+      factorizations: 1, alignedTimeEvents: 0, rankOneUpdates: 0, rankOneFallbacks: 0,
+      stateIterationFailures: 0 },
   };
 }
 
@@ -422,33 +447,47 @@ export function stepEngine(eng, probeId = null) {
   // 2) 求解 + 二极管状态定点迭代
   //    求解后检查二极管压降，若状态应改变则重建矩阵重新求解（最多 12 次），
   //    使二极管通断在本步内收敛，避免"一步延迟"造成的伪尖峰。
+  const timing = eng.timing;
   const assembleAndSolve = () => {
     if (eng.needsMatrixRebuild) {
+      const rebuildStart = timing ? performance.now() : 0;
       let reused = false;
       if (eng.linearSolver === 'inverse-rank1' && eng.factorDt === dt) {
         const changed = validEls.filter(el => el.type === 'diode' || el.type === 'switch')
           .filter(el => Boolean(eng.factorStates[el.id]) !== Boolean(switchStates[el.id]));
         const onlyDiodes = changed.length > 0 && changed.every(el => el.type === 'diode');
-        if (onlyDiodes && eng.rankOneSinceFull + changed.length <= eng.maxRankOneUpdates) {
-          let nextInverse = eng.A_inv;
-          for (const el of changed) {
-            const nextG = switchStates[el.id] ? 20 : 1e-8;
-            const oldG = eng.factorStates[el.id] ? 20 : 1e-8;
-            nextInverse = updateInverseForConductanceBranch(nextInverse, el.n1, el.n2, nextG - oldG,
-              { relativeDenominatorFloor: eng.rankOneDenominatorFloor });
-            if (!nextInverse) break;
-          }
-          if (nextInverse) {
-            eng.A_inv = nextInverse;
-            eng.rankOneSinceFull += changed.length;
-            eng.diagnostics.rankOneUpdates += changed.length;
-            reused = true;
-          } else {
-            eng.diagnostics.rankOneFallbacks += 1;
+        if (onlyDiodes) {
+          if (eng.rankOneSinceFull + changed.length <= eng.maxRankOneUpdates) {
+            if (timing) timing.rankOneAttempts += changed.length;
+            const updateStart = timing ? performance.now() : 0;
+            let nextInverse = eng.A_inv;
+            for (const el of changed) {
+              const nextG = switchStates[el.id] ? 20 : 1e-8;
+              const oldG = eng.factorStates[el.id] ? 20 : 1e-8;
+              nextInverse = updateInverseForConductanceBranch(nextInverse, el.n1, el.n2, nextG - oldG,
+                { relativeDenominatorFloor: eng.rankOneDenominatorFloor });
+              if (!nextInverse) break;
+            }
+            if (timing) timing.rankOneUpdateMs += performance.now() - updateStart;
+            if (nextInverse) {
+              eng.A_inv = nextInverse;
+              eng.rankOneSinceFull += changed.length;
+              eng.diagnostics.rankOneUpdates += changed.length;
+              if (timing) timing.rankOneUpdates += changed.length;
+              eng.work.rankOneUpdateCalls += changed.length;
+              reused = true;
+            } else {
+              eng.diagnostics.rankOneFallbacks += 1;
+              eng.work.rankOneFallbackCalls += 1;
+              if (timing) timing.rankOneFailures += 1;
+            }
+          } else if (timing) {
+            timing.rankOneCapSkips += changed.length;
           }
         }
       }
       if (!reused) {
+        const factorStart = timing ? performance.now() : 0;
         const A_new = buildMNA(eng.N, eng.M, dt, validEls, eng.branchEls, switchStates);
         if (eng.linearSolver === 'lu') {
           const factors = factorizeLU(A_new);
@@ -460,13 +499,20 @@ export function stepEngine(eng, probeId = null) {
           eng.A_inv = inv;
         }
         eng.diagnostics.factorizations += 1;
+        eng.work.factorizationCalls += 1;
         eng.rankOneSinceFull = 0;
+        if (timing) {
+          timing.factorizeMs += performance.now() - factorStart;
+          timing.factorizations += 1;
+        }
       }
       eng.factorStates = { ...switchStates };
       eng.factorDt = dt;
       eng.diagnostics.matrixRebuilds += 1;
       eng.needsMatrixRebuild = false;
+      if (timing) timing.matrixRebuildMs += performance.now() - rebuildStart;
     }
+    const rhsStart = timing ? performance.now() : 0;
     const b = Array(size).fill(0);
     validEls.forEach(el => {
       const { id, n1, n2, type, value } = el;
@@ -488,6 +534,7 @@ export function stepEngine(eng, probeId = null) {
         if (n2 >= 0) b[n2] -= ieq;
       }
     });
+    const solveStart = timing ? performance.now() : 0;
     // Reuse whichever matrix factorization belongs to the current PWL state.
     let x;
     if (eng.linearSolver === 'lu') {
@@ -500,11 +547,37 @@ export function stepEngine(eng, probeId = null) {
         x[i] = sum;
       }
     }
+    if (timing) {
+      timing.rhsAssemblyMs += solveStart - rhsStart;
+      timing.rhsSolveMs += performance.now() - solveStart;
+      timing.linearSolves += 1;
+    }
     eng.diagnostics.linearSolves += 1;
+    eng.work.solveCalls += 1;
     return x;
   };
 
   let x = null;
+  eng.lastStepConverged = true;
+  /**
+   * Failure contract for exhausted state iteration.
+   *
+   * The step is rolled back to the LAST state that was actually solved, the
+   * matrix is rebuilt for exactly that state and the system is re-solved once.
+   * That makes the committed solution, device states, dynamic history and
+   * factorization cache mutually consistent by construction, while the step is
+   * explicitly flagged as not state-converged (it is NOT reported as converged
+   * and it does NOT satisfy the hysteresis endpoint law).
+   */
+  const commitExhaustedIteration = (lastSolvedStates) => {
+    for (const id of Object.keys(switchStates)) switchStates[id] = lastSolvedStates[id];
+    eng.needsMatrixRebuild = true;     // discard any cache from a newer state
+    x = assembleAndSolve();            // re-solve the restored system
+    eng.needsMatrixRebuild = false;
+    eng.lastStepConverged = false;
+    eng.diagnostics.unresolvedSteps += 1;
+    eng.diagnostics.stateIterationFailures += 1;
+  };
   if (eng.diodeSolver !== 'iterative') {
     // Four experimental research methods use the same hysteretic 0.70/0.65 V state law.
     const predictedChanges = predictDiodeStates(validEls, switchStates, eng.previousSolution);
@@ -517,7 +590,7 @@ export function stepEngine(eng, probeId = null) {
     let correctedThisStep = false;
     let tightenedThisStep = false;
     let statesUsedForLastSolve = null;
-    for (let iter = 0; iter < 12; iter++) {
+    for (let iter = 0; iter < eng.maxStateIterations; iter++) {
       statesUsedForLastSolve = { ...switchStates };
       x = assembleAndSolve();
       if (eng.diodeSolver === 'predicted') { settled = true; break; }
@@ -538,12 +611,7 @@ export function stepEngine(eng, probeId = null) {
       eng.needsMatrixRebuild = true;
     }
     if (!settled) {
-      // Some switched networks do not have a consistent finite-state endpoint.
-      // Preserve the state used for the last SOLVED matrix and warn, rather
-      // than returning mismatched voltages and device states.
-      eng.diagnostics.unresolvedSteps += 1;
-      Object.assign(switchStates, statesUsedForLastSolve);
-      eng.needsMatrixRebuild = false;
+      commitExhaustedIteration(statesUsedForLastSolve);
     }
     if (correctedThisStep) eng.diagnostics.stepsWithCorrections += 1;
     if (tightenedThisStep) eng.diagnostics.adaptiveTightenedSteps += 1;
@@ -553,7 +621,7 @@ export function stepEngine(eng, probeId = null) {
     // the same state law as the three experimental research modes.
     let converged = false;
     let statesUsedForLastSolve = null;
-    for (let iter = 0; iter < 12; iter++) {
+    for (let iter = 0; iter < eng.maxStateIterations; iter++) {
       statesUsedForLastSolve = { ...switchStates };
       x = assembleAndSolve();
       let changed = false;
@@ -573,9 +641,7 @@ export function stepEngine(eng, probeId = null) {
       break;
     }
     if (!converged) {
-      eng.diagnostics.unresolvedSteps += 1;
-      Object.assign(switchStates, statesUsedForLastSolve);
-      eng.needsMatrixRebuild = false;
+      commitExhaustedIteration(statesUsedForLastSolve);
     }
   }
   eng.previousSolution = x.slice();

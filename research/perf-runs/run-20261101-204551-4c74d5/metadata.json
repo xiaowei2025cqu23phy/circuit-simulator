@@ -1,0 +1,35 @@
+{
+  "run_id": "run-20261101-204551-4c74d5",
+  "created_at": "2026-11-01T20:45:55.8981661+08:00",
+  "git_sha": "de671af6beaf960321c2b42dfb84892bd90d24a0",
+  "node": "v26.8.1",
+  "npm": "11.19.0",
+  "platform": "win32",
+  "cpu": "AMD Ryzen 5 7520U with Radeon Graphics",
+  "os": "Microsoft Windows 11 家庭版 中文版",
+  "parameters": {
+    "batches": 3,
+    "reps": 3,
+    "warmup": 1,
+    "seed": 20261031,
+    "cases": [
+      "rc-64",
+      "rc-256",
+      "light-96",
+      "light-128",
+      "light-256",
+      "heavy-12",
+      "heavy-24",
+      "heavy-64",
+      "heavy-128",
+      "heavy-256",
+      "timed-switch-24"
+    ]
+  },
+  "commands": [
+    "pwsh -File scripts/run-stage3-perf.ps1 -Batches 3 -Reps 3 -Warmup 1 -Seed 20261031",
+    "node scripts/perf-aggregate.mjs --run=D:\\Users\\34745\\Desktop\\github\\circuit-simulator-hsp-validation\\research\\perf-runs\\run-20261101-204551-4c74d5"
+  ],
+  "solver_order": "deterministic shuffle from per-(batch,case) seed",
+  "notes": "Every probe process writes exactly one new CSV; existing files are never overwritten or appended."
+}

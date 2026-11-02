@@ -1,0 +1,16 @@
+mna_dimension,method,median_ms,q1_ms,q3_ms,complete_factorizations,rank_one_updates,rank_one_fallbacks,linear_solutions,worst_residual_inf,worst_delta_vs_full_inverse_v,events,rhs_per_event,node_version,cpu_model
+8,gauss-jordan-inverse,1.646800,1.491600,2.458000,25,0,0,192,7.105427e-15,0.000000e+0,24,8,v26.8.1,AMD Ryzen 5 7520U with Radeon Graphics
+8,dense-lu,1.071200,0.918600,1.319000,25,0,0,192,3.552714e-15,4.440892e-16,24,8,v26.8.1,AMD Ryzen 5 7520U with Radeon Graphics
+8,inverse-rank1,1.895400,1.754600,2.307400,1,24,0,192,5.773160e-15,5.495604e-15,24,8,v26.8.1,AMD Ryzen 5 7520U with Radeon Graphics
+16,gauss-jordan-inverse,3.695300,3.159500,7.228700,25,0,0,192,7.105427e-15,0.000000e+0,24,8,v26.8.1,AMD Ryzen 5 7520U with Radeon Graphics
+16,dense-lu,1.613200,1.352700,1.845100,25,0,0,192,7.105427e-15,6.661338e-16,24,8,v26.8.1,AMD Ryzen 5 7520U with Radeon Graphics
+16,inverse-rank1,4.028500,3.942600,5.340800,1,24,0,192,1.371125e-14,1.054712e-14,24,8,v26.8.1,AMD Ryzen 5 7520U with Radeon Graphics
+32,gauss-jordan-inverse,14.255400,13.826200,15.081900,25,0,0,192,7.105427e-15,0.000000e+0,24,8,v26.8.1,AMD Ryzen 5 7520U with Radeon Graphics
+32,dense-lu,5.311700,4.061300,5.931000,25,0,0,192,7.105427e-15,1.110223e-15,24,8,v26.8.1,AMD Ryzen 5 7520U with Radeon Graphics
+32,inverse-rank1,10.381300,8.887200,10.492600,1,24,0,192,1.065814e-14,7.993606e-15,24,8,v26.8.1,AMD Ryzen 5 7520U with Radeon Graphics
+64,gauss-jordan-inverse,86.523400,84.014500,96.330400,25,0,0,192,7.105427e-15,0.000000e+0,24,8,v26.8.1,AMD Ryzen 5 7520U with Radeon Graphics
+64,dense-lu,22.666200,21.589800,24.831400,25,0,0,192,7.105427e-15,1.554312e-15,24,8,v26.8.1,AMD Ryzen 5 7520U with Radeon Graphics
+64,inverse-rank1,38.383400,32.747400,43.416400,1,24,0,192,7.105427e-15,4.996004e-15,24,8,v26.8.1,AMD Ryzen 5 7520U with Radeon Graphics
+96,gauss-jordan-inverse,244.446700,236.403200,244.794300,25,0,0,192,1.065814e-14,0.000000e+0,24,8,v26.8.1,AMD Ryzen 5 7520U with Radeon Graphics
+96,dense-lu,65.046200,60.821100,66.135600,25,0,0,192,7.105427e-15,1.998401e-15,24,8,v26.8.1,AMD Ryzen 5 7520U with Radeon Graphics
+96,inverse-rank1,76.992300,69.695300,79.204200,1,24,0,192,7.105427e-15,3.774758e-15,24,8,v26.8.1,AMD Ryzen 5 7520U with Radeon Graphics

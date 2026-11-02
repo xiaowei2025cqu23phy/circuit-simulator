@@ -1,0 +1,1 @@
+{"node":"v26.8.1","platform":"win32","arch":"x64","cpu":"AMD Ryzen 5 7520U with Radeon Graphics         ","cpuCount":8,"sizes":[128],"repetitions":5,"events":24,"rhs":1}

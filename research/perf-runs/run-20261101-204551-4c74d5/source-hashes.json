@@ -1,0 +1,18 @@
+{
+  "generatedAt": "2026-11-01T12:52:45.298Z",
+  "files": {
+    "src/sim/engine.js": "5f867a42a61dd30459dc4530f8842b62f122f8ab52ca21a58c2eed926cca7039",
+    "src/sim/mnaResidual.js": "d34c8a5ddb4852ea3b7a11c7486f8c6f0a39812ef24e04792ff552229280983b",
+    "src/sim/researchDiodeModels.js": "30540aaceb4f6bb212b983f239893929cc9cfbc5073046f4aa7decf576b9c8f8",
+    "src/sim/independentMna.js": "d0cb4414c7f331934c50b98a3866ac2ac0de9692b04f19a21207fb0b0d820184",
+    "src/sim/researchCircuits.js": "79986252be5e9bead479478251ab644329a436cf9c11947fa1cf629d8d03e973",
+    "src/sim/perfStats.js": "6c69132b870ec86c79296f8be412345c5e6666f3ed22eb195b0453fd551e5563",
+    "src/sim/eventRefinement.js": "7c6231a3b55916f8675a9983e60efebd944a2f828eb43fe7477cde7852119ce3",
+    "scripts/perf-probe.mjs": "2782907eb40269264b6d68b9c01e0e97cf2492a87bb151a41561036b80d35aa4",
+    "scripts/perf-aggregate.mjs": "0fe4654966eae85c8e3e6773fcfc09902cf782df18a45df053a3a33a84775869",
+    "scripts/run-stage3-perf.ps1": "945d4c2f0cf031df71a83ea8d3c01f9324317abc27b5eeae8b28d7a5a4d786fe",
+    "scripts/compare-hsp-same-model.mjs": "8d8958ca8471605474955dd2eb73655039ec9c64cc2e2df0b83c875aaeda4fdc",
+    "scripts/compare-diode-models.mjs": "48f12fd9e255239aecacd2c427adb1c6d2da386f7b0346f72d3146854d0255b2",
+    "scripts/verify-pwl-calibration.mjs": "6e015fbdc7cbd70dccf231ae4ab89538eefe1bb1272586985bdd600bcf65a1b8"
+  }
+}
